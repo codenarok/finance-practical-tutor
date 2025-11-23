@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Finance Tutor</title>
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+  <div class="page">
+    <div class="auth-card" id="auth-card">
+      <h1>Finance Tutor Login</h1>
+      <p class="subtitle">Securely sign in or create a free account.</p>
+      <form id="login-form">
+        <label>Email</label>
+        <input type="email" id="login-email" required />
+        <label>Password</label>
+        <input type="password" id="login-password" required />
+        <button type="submit">Login</button>
+      </form>
+      <hr />
+      <form id="register-form">
+        <h2>New here?</h2>
+        <label>Email</label>
+        <input type="email" id="register-email" required />
+        <label>Password</label>
+        <input type="password" id="register-password" required />
+        <button type="submit">Create account</button>
+      </form>
+      <p class="note">Passwords are securely hashed. Never share them.</p>
+      <p class="note">We do not store chat messages for privacy.</p>
+    </div>
+
+    <div class="chat-card hidden" id="chat-card">
+      <div class="chat-header">
+        <div>
+          <h1>Finance Tutor</h1>
+          <p class="subtitle">Educational guidance only — not professional financial advice.</p>
+        </div>
+        <button id="logout-btn" class="secondary">Logout</button>
+      </div>
+      <div class="chat-window" id="chat-window">
+        <div class="message bot">
+          <div class="bubble">
+            What's your current finance knowledge level? (Beginner / Intermediate / Advanced)
+          </div>
+        </div>
+      </div>
+      <form id="chat-form" class="chat-input">
+        <input type="text" id="knowledge-level" placeholder="Knowledge level" value="Beginner" />
+        <input type="text" id="topic" placeholder="Topic e.g. budgeting" />
+        <input type="text" id="chat-message" placeholder="Ask a finance question" required />
+        <button type="submit">Send</button>
+      </form>
+    </div>
+  </div>
+
+  <script src="/static/script.js"></script>
+</body>
+</html>
