@@ -72,7 +72,7 @@ def register_user(payload: RegisterRequest, session: Session = Depends(get_db)) 
         user = user_manager.create_user(session, payload.email, payload.password)
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
-    token = create_access_token({"sub": user.id})
+    token = create_access_token({"sub": str(user.id)})
     return TokenResponse(access_token=token)
 
 
@@ -83,5 +83,5 @@ def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), ses
     user = user_manager.authenticate_user(session, form_data.username, form_data.password)
     if not user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Incorrect email or password")
-    token = create_access_token({"sub": user.id})
+    token = create_access_token({"sub": str(user.id)})
     return TokenResponse(access_token=token)

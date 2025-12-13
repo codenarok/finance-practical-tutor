@@ -6,12 +6,21 @@ const chatForm = document.getElementById('chat-form');
 const chatWindow = document.getElementById('chat-window');
 const logoutBtn = document.getElementById('logout-btn');
 
+function formatMessage(text) {
+  const escaped = text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+  const bolded = escaped.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+  return bolded.replace(/\n/g, '<br>');
+}
+
 function showMessage(text, sender = 'bot') {
   const wrapper = document.createElement('div');
   wrapper.className = `message ${sender}`;
   const bubble = document.createElement('div');
   bubble.className = 'bubble';
-  bubble.textContent = text;
+  bubble.innerHTML = formatMessage(text);
   wrapper.appendChild(bubble);
   chatWindow.appendChild(wrapper);
   chatWindow.scrollTop = chatWindow.scrollHeight;
@@ -58,6 +67,7 @@ loginForm.addEventListener('submit', async (e) => {
   const formData = new URLSearchParams();
   formData.append('username', email);
   formData.append('password', password);
+  formData.append('grant_type', 'password');
   try {
     const res = await fetch('/api/login', {
       method: 'POST',

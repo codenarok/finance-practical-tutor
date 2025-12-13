@@ -1,5 +1,8 @@
 """Application configuration using environment variables."""
-from pydantic import BaseSettings, Field
+from functools import lru_cache
+
+from pydantic import Field
+from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
@@ -19,6 +22,7 @@ class Settings(BaseSettings):
         env_file_encoding = "utf-8"
 
 
+@lru_cache
 def get_settings() -> Settings:
     """Return cached application settings."""
 

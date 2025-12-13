@@ -34,7 +34,7 @@ class LLaMAModel:
         """Call Ollama to generate a tutor response."""
 
         prompt = self.build_prompt(knowledge_level, topic, user_message)
-        payload = {"model": self.settings.ollama_model, "prompt": prompt}
+        payload = {"model": self.settings.ollama_model, "prompt": prompt, "stream": False}
         response = requests.post(f"{self.settings.ollama_base_url}/api/generate", json=payload, timeout=60)
         response.raise_for_status()
         content = response.json().get("response", "")

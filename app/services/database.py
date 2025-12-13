@@ -1,9 +1,11 @@
 """Database management using SQLAlchemy for PostgreSQL."""
 from contextlib import contextmanager
+from time import sleep
 from typing import Generator
 
 from sqlalchemy import create_engine
-from sqlalchemy.orm import declarative_base, sessionmaker, Session
+from sqlalchemy.exc import OperationalError
+from sqlalchemy.orm import Session, declarative_base, sessionmaker
 
 from app.config import get_settings
 
@@ -17,10 +19,18 @@ class DatabaseManager:
         self.SessionLocal = sessionmaker(bind=self.engine, autoflush=False, autocommit=False, future=True)
         self.Base = declarative_base()
 
-    def create_all(self) -> None:
-        """Create tables in the configured database."""
+    def create_all(self, max_attempts: int = 5, delay_seconds: float = 2.0) -> None:
+        """Create tables in the configured database, retrying until the DB is ready."""
 
-        self.Base.metadata.create_all(bind=self.engine)
+        for attempt in range(1, max_attempts + 1):
+            try:
+                self.Base.metadata.create_all(bind=self.engine)
+            except OperationalError:
+                if attempt == max_attempts:
+                    raise
+                sleep(delay_seconds)
+            else:
+                break
 
     @contextmanager
     def session_scope(self) -> Generator[Session, None, None]:
