@@ -26,6 +26,9 @@ body {
   display: grid;
   gap: 1.5rem;
 }
+.page.single-column {
+  max-width: 420px;
+}
 
 .auth-card, .chat-card {
   background: linear-gradient(145deg, rgba(17, 24, 39, 0.9), rgba(17, 24, 39, 0.7));

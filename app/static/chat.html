@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Finance Tutor Chat</title>
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body data-page="chat">
+  <div class="page">
+    <div class="chat-card" id="chat-card">
+      <div class="chat-header">
+        <div>
+          <h1>Finance Tutor</h1>
+          <p class="subtitle">Educational guidance only — not professional financial advice.</p>
+        </div>
+        <button id="logout-btn" class="secondary">Logout</button>
+      </div>
+      <div class="chat-window" id="chat-window">
+        <div class="message bot">
+          <div class="bubble">
+            What's your current finance knowledge level? (Beginner / Intermediate / Advanced)
+          </div>
+        </div>
+      </div>
+      <form id="chat-form" class="chat-input">
+        <input type="text" id="knowledge-level" placeholder="Knowledge level" value="Beginner" />
+        <input type="text" id="topic" placeholder="Topic e.g. budgeting" />
+        <input type="text" id="chat-message" placeholder="Ask a finance question" required />
+        <button type="submit">Send</button>
+      </form>
+    </div>
+  </div>
+
+  <script src="/static/script.js"></script>
+</body>
+</html>

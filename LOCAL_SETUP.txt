@@ -1,0 +1,88 @@
+Finance Practical Tutor – Local Run Instructions
+===============================================
+
+Prerequisites
+-------------
+1. Python 3.12+
+2. Docker (optional, only if you want Postgres via docker-compose)
+3. Ollama installed locally (`brew install ollama` on macOS or follow https://ollama.com/download)
+
+
+1. Create & Activate a Virtual Environment
+------------------------------------------
+```
+python3 -m venv .venv
+source .venv/bin/activate
+```
+
+
+2. Install Python Requirements
+------------------------------
+```
+pip install --upgrade pip
+pip install -r requirements.txt
+```
+
+
+3. Start Postgres
+-----------------
+Option A – Docker (recommended for quick local use):
+```
+docker compose up db
+```
+
+Option B – Use your own Postgres instance and create a database (e.g., `fintutor`).
+
+
+4. Start Ollama Server and Model
+--------------------------------
+1. Launch the Ollama daemon:
+   ```
+   ollama serve
+   ```
+2. In a separate terminal, pull the model you configured (default `llama3`):
+   ```
+   ollama pull llama3
+   ```
+Keep the Ollama server running; the FastAPI app calls it at `http://localhost:11434`.
+
+
+5. Configure Environment Variables
+----------------------------------
+Create a `.env` file or export the variables manually, e.g.:
+```
+export DATABASE_URL=postgresql+psycopg2://user:pass@localhost:5432/fintutor
+export SECRET_KEY=change-me
+export OLLAMA_BASE_URL=http://localhost:11434
+export OLLAMA_MODEL=llama3
+```
+
+
+6. Initialize the API
+---------------------
+```
+uvicorn app.main:app --reload
+```
+The startup hook auto-creates tables (with retry) using the configured DB URL.
+
+
+7. Use the App
+--------------
+1. Visit `http://localhost:8000/static/index.html` to register or log in.
+2. After login, you are redirected to the chat UI (`chat.html`).
+3. Accounts persist in the database; hashed passwords ensure security even after server restarts.
+
+
+8. Optional – Full Stack via Docker Compose
+-------------------------------------------
+To spin up API + Postgres + Ollama in one go:
+```
+docker compose up --build
+```
+This exposes the API on `http://localhost:8000` and connects it to embedded Postgres and Ollama containers.
+
+Troubleshooting
+---------------
+- If `/api/chat` returns “Tutor unavailable”, verify `ollama serve` is running and the model is pulled.
+- For DB connection errors, ensure Postgres is reachable and credentials match `DATABASE_URL`.
+- Restart `uvicorn` whenever `.env` values change (settings are cached).
