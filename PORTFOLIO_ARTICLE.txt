@@ -1,0 +1,206 @@
+Finance Practical Tutor – Project Deep Dive
+===========================================
+
+Contents
+--------
+1. Problem Statement & Vision
+2. Solution Architecture Overview
+3. Authentication & Security (and why it matters)
+4. AI Tutor Pipeline (Ollama + LLaMA)
+5. Front-End Experience & UX Choices
+6. Local Development & Deployment
+7. Challenges, Trade-offs, and Lessons
+8. Extensibility & Future Work
+
+
+1. Problem Statement & Vision
+-----------------------------
+Many early-stage learners struggle to find finance explanations that are both trustworthy and tailored to their knowledge level. I built **Finance Practical Tutor**, a FastAPI application backed by an Ollama-hosted LLaMA model, to offer a guided, privacy-preserving tutoring experience. The goals were:
+- Offer secure registration/login with hashed credentials.
+- Gate the chat experience behind authentication.
+- Provide consistent AI replies that include simplified explanations, actionable exercises, and a disclaimer.
+- Avoid storing chat history to respect user privacy.
+- Make it easy to run locally via Python + Docker + Ollama.
+
+
+2. Solution Architecture Overview
+---------------------------------
+The stack is intentionally minimal to highlight backend craftsmanship:
+
+```
+Browser (HTML/CSS/JS)
+    |
+    |  fetch()
+    v
+FastAPI (AuthController, ChatController)
+    |-- UserManager (SQLAlchemy + passlib)
+    |-- LLaMAModel (Ollama prompt template)
+    |-- DatabaseManager (PostgreSQL/SQLite)
+```
+
+**Key Technologies**
+- **FastAPI** for request handling and dependency injection.
+- **SQLAlchemy 2.0** for ORM access to PostgreSQL (dockerized) or SQLite (local dev).
+- **Passlib + bcrypt** for password hashing.
+- **python-jose** for JWT tokens.
+- **Ollama** running `llama3` locally for low-latency inference (no 3rd-party API keys).
+- **Vanilla HTML/CSS/JS** for the UI (easily portable to static hosting).
+- **Docker Compose** to orchestrate Postgres, the FastAPI app, and Ollama.
+
+
+3. Authentication & Security
+----------------------------
+**Why hash passwords?** Plain-text credentials are a liability—if the database is ever compromised, attackers get instant access. Hashing converts the password into a one-way representation; even I cannot recover the original text. Adding per-user salt and using a slow algorithm like bcrypt dramatically increases the cost of brute-force attacks.
+
+**User Model** (SQLAlchemy) stores `email`, `password_hash`, and timestamps. Passwords never touch disk; they are hashed immediately:
+
+```python
+# app/managers/user_manager.py
+password_hash = self.pwd_context.hash(password)
+session.add(User(email=email, password_hash=password_hash))
+```
+
+**JWT Tokens**: The `/api/register` and `/api/login` endpoints issue short-lived tokens. JWTs let the API remain stateless—every request carries its own proof of identity signed with the `SECRET_KEY`. This is essential once you scale horizontally because any replica can validate the token without checking shared session storage.
+
+```python
+# app/controllers/auth_controller.py
+token = create_access_token({"sub": str(user.id)})
+return TokenResponse(access_token=token)
+```
+
+`OAuth2PasswordBearer` protects `/api/chat`. The `get_current_user` dependency decodes the JWT and loads the user from the DB. If the token is missing/invalid, FastAPI automatically returns `401`.
+
+**Client-Side Token Handling**: The front-end keeps tokens in `sessionStorage` (cleared on logout/refresh) and automatically redirects unauthorized users to the login page:
+
+```javascript
+// app/static/script.js
+if (!getToken()) {
+  window.location.href = '/static/index.html';
+}
+```
+
+This means the chat view (`chat.html`) is inaccessible unless the user has a valid session.
+
+
+4. AI Tutor Pipeline (Ollama + LLaMA)
+-------------------------------------
+**Prompt Engineering**: I enforce a deterministic structure so the tutor always returns three parts—explanation, exercise, disclaimer.
+
+```python
+# app/services/llama_model.py
+prompt = (
+    "You are a patient finance tutor..."
+    "1) Simplified explanation..."
+    "2) A safe exercise..."
+    "3) Add: 'This is educational only — not professional financial advice.'"
+)
+payload = {"model": settings.ollama_model, "prompt": prompt, "stream": False}
+response = requests.post(f"{settings.ollama_base_url}/api/generate", json=payload, timeout=60)
+```
+
+**Error Handling**: Any exceptions from Ollama (network, timeout, missing model) are caught and transformed into a friendly 503 with a retry message. This keeps the UX predictable even when the model is unavailable.
+
+**Local AI Hosting**: Running the model via Ollama eliminates external API dependencies. In Docker, the `ollama` service exposes port `11434`, and the app container calls it over the internal network. For local Python runs, I can point `OLLAMA_BASE_URL` to `http://localhost:11434`.
+
+
+5. Front-End Experience & UX Choices
+------------------------------------
+I deliberately chose plain HTML/CSS/JS to show mastery without relying on frameworks. The login/register page is the only public route; the chat screen (`chat.html`) is a separate page that loads after authentication.
+
+**Message Rendering**: Chat bubbles are generated dynamically, with minimal Markdown support (bold, line breaks) using safe escaping:
+
+```javascript
+function formatMessage(text) {
+  const escaped = text.replace(/&/g, '&amp;').replace(/</g, '&lt;');
+  return escaped.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br>');
+}
+```
+
+**Session Flow**:
+1. User registers/logs in → receives JWT → stored in `sessionStorage`.
+2. Browser redirects to `/static/chat.html`.
+3. Chat interactions send the JWT in the `Authorization: Bearer` header.
+4. Logout or missing token returns the user to the login screen.
+
+**Why no SPA?** For a portfolio piece, clarity beats complexity. Everything is easy to inspect and reason about, and the UI can be progressively enhanced later.
+
+
+6. Local Development & Deployment
+---------------------------------
+I provided two paths: pure Python and Docker Compose.
+
+**Python Path**
+1. `python3 -m venv .venv && source .venv/bin/activate`
+2. `pip install -r requirements.txt` (includes FastAPI, SQLAlchemy, Passlib, Ollama client, etc.)
+3. Set environment variables (`DATABASE_URL`, `SECRET_KEY`, `OLLAMA_*`).
+4. `ollama serve` + `ollama pull llama3`
+5. `uvicorn app.main:app --reload`
+
+**Docker Compose Path**
+```
+docker compose up --build
+```
+
+This launches:
+- `db`: Postgres 15 with a mounted volume.
+- `ollama`: official Ollama daemon (port 11434).
+- `app`: FastAPI container listening on port 8000.
+
+The FastAPI startup event automatically creates tables (with retry logic to wait for Postgres):
+
+```python
+for attempt in range(1, max_attempts + 1):
+    try:
+        self.Base.metadata.create_all(bind=self.engine)
+    except OperationalError:
+        sleep(delay_seconds)
+    else:
+        break
+```
+
+
+7. Challenges, Trade-offs, and Lessons
+--------------------------------------
+**1. FastAPI + Pydantic Compatibility**
+- FastAPI ≥0.111 requires Pydantic v2. I upgraded the stack, added `pydantic-settings`, and wrapped `get_settings()` in `@lru_cache()` so configuration loads once per process.
+- Lesson: Align framework and validation libraries early; mismatched versions cause confusing runtime errors.
+
+**2. Ollama Streaming vs Non-Streaming**
+- By default, Ollama streams NDJSON chunks. To keep the code simple, I set `"stream": false` to receive a single JSON blob.
+- Lesson: Always test with the actual model host; API defaults often differ from assumptions.
+
+**3. Database Readiness in Containers**
+- When the FastAPI container booted faster than Postgres, `create_all()` failed. Adding retry/backoff fixed the crash-loop.
+- Lesson: Production setups need health checks or migrations; even local stacks benefit from resilience.
+
+**4. Bcrypt Version Mismatch**
+- Passlib expects bcrypt to expose a `__about__.__version__` attribute. The latest bcrypt releases removed it, causing `AttributeError: module 'bcrypt' has no attribute '__about__'` during login. I pinned `bcrypt==4.0.1`, the newest version still compatible with Passlib’s introspection, and documented the reasoning in `requirements.txt`.
+- Lesson: “Latest” is not always “best.” Understanding library internals and reading stack traces carefully prevents chasing the wrong bug.
+
+**5. Client-Side Security**
+- Storing tokens in `sessionStorage` (instead of `localStorage`) ensures sessions end when the tab closes. The chat page also enforces a token check before rendering.
+- Lesson: Security isn’t just backend logic; UX flows must reinforce it.
+
+**6. Model Availability**
+- During Docker runs, 503 errors surfaced until `ollama pull llama3` ran inside the container. I documented this in `LOCAL_SETUP.txt` to help others avoid the same trap.
+
+
+8. Extensibility & Future Work
+------------------------------
+This project can evolve in several directions:
+- **Rich Analytics**: log anonymized usage stats or satisfaction scores (with explicit consent).
+- **Conversation History**: optionally store threads (encrypted) so users can continue sessions later.
+- **Advanced Front-End**: port the UI to React or Vue, add streaming responses, or integrate charts.
+- **Multiple Models**: allow users to choose from different LLaMA variants or domain-specific prompts.
+- **CI/CD**: container image build + automated tests for both API and UI.
+
+
+Closing Thoughts
+----------------
+Finance Practical Tutor demonstrates how to combine secure authentication, a deterministic AI prompt pipeline, and a clean UI into a cohesive product. It showcases:
+- Practical FastAPI patterns (dependency injection, response models).
+- Responsible password handling with bcrypt.
+- Real-world AI integration via self-hosted models.
+- Thoughtful UX flows that respect privacy and clarity.
+
+Whether you’re evaluating my backend skills or looking for inspiration for your own tutoring app, this project serves as a blueprint for building AI-assisted education tools with strong fundamentals.
