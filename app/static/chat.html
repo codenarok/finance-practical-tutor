@@ -46,6 +46,40 @@
           </div>
         </div>
       </div>
+      <details class="calculators">
+        <summary>Calculators</summary>
+        <p class="note">The sums are done by the app, not the AI. The result joins the chat so you can ask the tutor about it.</p>
+        <div class="calculator-grid">
+          <form class="calculator" data-endpoint="take-home">
+            <h2>Take-home pay</h2>
+            <label for="calc-salary">Salary per year (£)</label>
+            <input type="number" id="calc-salary" name="salary" min="0" max="10000000" step="0.01" required />
+            <button type="submit" class="secondary">Work it out</button>
+          </form>
+          <form class="calculator" data-endpoint="savings-growth">
+            <h2>Savings growth</h2>
+            <label for="calc-initial">Starting amount (£)</label>
+            <input type="number" id="calc-initial" name="initial" min="0" max="10000000" step="0.01" value="0" required />
+            <label for="calc-monthly">Paid in each month (£)</label>
+            <input type="number" id="calc-monthly" name="monthly" min="0" max="10000000" step="0.01" required />
+            <label for="calc-rate">Growth per year (%)</label>
+            <input type="number" id="calc-rate" name="annual_rate_percent" min="0" max="100" step="0.01" required />
+            <label for="calc-years">Years</label>
+            <input type="number" id="calc-years" name="years" min="1" max="60" step="1" required />
+            <button type="submit" class="secondary">Work it out</button>
+          </form>
+          <form class="calculator" data-endpoint="debt-payoff">
+            <h2>Debt payoff</h2>
+            <label for="calc-balance">Amount owed (£)</label>
+            <input type="number" id="calc-balance" name="balance" min="0.01" max="10000000" step="0.01" required />
+            <label for="calc-apr">Interest rate (APR %)</label>
+            <input type="number" id="calc-apr" name="apr_percent" min="0" max="100" step="0.01" required />
+            <label for="calc-payment">Payment each month (£)</label>
+            <input type="number" id="calc-payment" name="monthly_payment" min="0.01" max="10000000" step="0.01" required />
+            <button type="submit" class="secondary">Work it out</button>
+          </form>
+        </div>
+      </details>
       <form id="chat-form" class="chat-input">
         <label for="chat-message" class="visually-hidden">Your message</label>
         <input type="text" id="chat-message" placeholder="Ask a finance question" maxlength="2000" autocomplete="off" required />

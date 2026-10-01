@@ -135,6 +135,19 @@ button.secondary {
 .field { display: grid; gap: 0.25rem; }
 select option { background: var(--card); color: var(--text); }
 
+.message.bot .bubble.calculation { border: 1px solid rgba(34, 211, 238, 0.35); }
+
+.calculators summary { cursor: pointer; color: var(--accent); font-weight: 600; }
+.calculators .note { margin: 0.5rem 0; }
+.calculator-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+  align-items: start;
+}
+.calculator { margin: 0; }
+.calculator h2 { font-size: 1rem; }
+
 .chat-input {
   display: grid;
   grid-template-columns: 1fr auto;
@@ -143,6 +156,6 @@ select option { background: var(--card); color: var(--text); }
 }
 
 @media (max-width: 768px) {
-  .chat-input, .chat-settings { grid-template-columns: 1fr; }
+  .chat-input, .chat-settings, .calculator-grid { grid-template-columns: 1fr; }
   .message .bubble { max-width: 100%; }
 }

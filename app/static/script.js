@@ -172,6 +172,50 @@ function initChatPage() {
     if (!busy) messageInput.focus();
   }
 
+  // Calculators: the server does the sums and signs the result, which then joins
+  // the conversation so the tutor can explain it.
+  document.querySelectorAll('form.calculator').forEach((form) => {
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const currentToken = getToken();
+      if (!currentToken) {
+        redirectToLogin();
+        return;
+      }
+      const fields = Object.fromEntries(new FormData(form).entries());
+      if (fields.years) fields.years = Number(fields.years);
+      const button = form.querySelector('button');
+      button.disabled = true;
+      try {
+        const res = await fetch(`/api/calculate/${form.dataset.endpoint}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${currentToken}`
+          },
+          body: JSON.stringify(fields)
+        });
+        if (res.status === 401) {
+          redirectToLogin();
+          return;
+        }
+        if (!res.ok) {
+          showMessage(await errorDetail(res, 'That could not be worked out.'), 'bot').classList.add('failed');
+          return;
+        }
+        const result = await res.json();
+        showMessage(result.summary, 'bot').classList.add('calculation');
+        conversation.push({ role: 'assistant', content: result.summary, sig: result.sig });
+        form.closest('details').open = false;
+        messageInput.focus();
+      } catch (err) {
+        showMessage('Network issue. Please try again.', 'bot').classList.add('failed');
+      } finally {
+        button.disabled = false;
+      }
+    });
+  });
+
   if (chatForm) {
     chatForm.addEventListener('submit', async (e) => {
       e.preventDefault();

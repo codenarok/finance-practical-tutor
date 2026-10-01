@@ -1,7 +1,7 @@
 """Chat endpoint: streaming, conversation history, input caps and model failures."""
 from fastapi.testclient import TestClient
 
-from app.controllers.chat_controller import sign_reply
+from app.services.signing import sign_reply
 
 
 def test_reply_is_streamed_as_tokens_then_a_signed_done_event(client: TestClient, auth_headers, fake_ollama, read_events) -> None:

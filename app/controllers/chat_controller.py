@@ -1,6 +1,4 @@
 """Chat controller that interacts with the finance tutor model."""
-import hashlib
-import hmac
 import json
 from typing import Iterator, Literal, Optional
 
@@ -13,6 +11,7 @@ from app.controllers.auth_controller import get_current_user
 from app.models.user import User
 from app.services.llama_model import TutorUnavailable, llama_model
 from app.services.rate_limiter import chat_limiter
+from app.services.signing import is_signed_by_server, sign_reply
 
 
 settings = get_settings()
@@ -54,21 +53,13 @@ class ChatRequest(BaseModel):
     history: list[HistoryItem] = Field(default_factory=list, max_length=MAX_HISTORY_ITEMS)
 
 
-def sign_reply(user_id: int, content: str) -> str:
-    """Sign a tutor reply so it can be trusted when the browser sends it back as history."""
-
-    return hmac.new(settings.secret_key.encode("utf-8"), f"{user_id}:{content}".encode("utf-8"), hashlib.sha256).hexdigest()
-
-
 def trusted_history(user_id: int, history: list[HistoryItem]) -> list[dict[str, str]]:
     """Keep the newest turns that fit the budget, dropping tutor turns this server did not write."""
 
     kept: list[dict[str, str]] = []
     used_chars = 0
     for item in reversed(history):
-        if item.role == "assistant" and not (
-            item.sig and hmac.compare_digest(item.sig, sign_reply(user_id, item.content))
-        ):
+        if item.role == "assistant" and not (item.sig and is_signed_by_server(user_id, item.content, item.sig)):
             continue
         used_chars += len(item.content)
         if used_chars > settings.max_history_chars:

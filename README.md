@@ -12,6 +12,7 @@ FastAPI (AuthController, ChatController)
    |-- UserManager (bcrypt hashing)
    |-- RateLimiter (login, register, chat)
    |-- LLaMAModel (Ollama chat endpoint, fixed system prompt, hard caps)
+   |-- UK figures (dated tax-year table from gov.uk) + calculators (pure Python)
    |-- DatabaseManager (PostgreSQL, or SQLite locally)
 ```
 
@@ -29,6 +30,8 @@ FastAPI (AuthController, ChatController)
 - A real conversation: the browser keeps the history in the tab and sends it with each message, and the reply streams in as it is written
 - Tutor replies are signed by the server, so a tutor turn the browser sends back is only trusted if this server wrote it
 - Level and topic are fixed choices; the learner's text only ever reaches the model as a user message, never as part of the instructions
+- UK rates and allowances come from a dated table in code (each with its gov.uk source), not from the model's memory
+- Calculators for take-home pay, savings growth and debt payoff: the app does the sums, and the signed result joins the chat for the tutor to explain
 - Hard caps on every model call: message length, history size, reply tokens, total time, one attempt, per-user rate limit
 - Simple responsive UI without front-end frameworks
 
@@ -86,9 +89,22 @@ The backend sends a fixed system prompt that:
 - Restricts scope to finance topics: investing basics, budgeting, UK taxes (PAYE/NI/ISA), retirement (ISA/SIPP/pensions), risk, debt, and business finance
 - Asks for a simplified explanation followed by a safe, practical exercise, and for follow-ups to be answered in context
 - Tells the tutor to teach concepts and never recommend specific products or tell learners what to do with their money
-- Tells the tutor to send learners to gov.uk rather than guess a current rate or allowance
+- Lists the official figures for the chosen topic and the tax year they belong to, and tells the tutor to send learners to gov.uk for anything not listed rather than guess a number
+- Tells the tutor not to work out tax, pay, growth or repayment figures itself, and to use calculator results from the conversation exactly
 
 The disclaimer ("Educational guidance only — not professional financial advice") is part of the page itself, so it does not depend on the model remembering to say it.
+
+## UK Figures and Calculators
+`app/services/uk_figures.py` holds the figures for one tax year (currently 2026 to 2027, checked against gov.uk on 1 October 2026): Income Tax bands and Personal Allowance, employee and employer National Insurance, ISA and Lifetime ISA limits, pension allowances and automatic enrolment, the new State Pension, and the savings, dividend and capital gains allowances. Income Tax bands are for England, Wales and Northern Ireland.
+
+Once that tax year ends, the tutor is told the figures may have changed and says so to the learner. To roll over, re-check each source page, update the numbers and dates, and run the tests, which include gov.uk's own worked examples.
+
+`app/services/calculators.py` does the arithmetic with `Decimal`:
+- **Take-home pay** – Income Tax (including the allowance taper above £100,000) and category A National Insurance on equal monthly pay.
+- **Savings growth** – a starting amount plus monthly payments at a steady rate, compounded monthly.
+- **Debt payoff** – months to clear and total interest for a fixed payment; a payment that never clears the debt is reported, not looped on.
+
+These are estimates with their assumptions stated in every result. They are not a payroll or a lender's figures.
 
 ## Example Prompts
 - Topic: Budgeting — "How should I split my monthly salary?"
@@ -103,7 +119,8 @@ The disclaimer ("Educational guidance only — not professional financial advice
 - No sensitive data other than login credentials is stored.
 
 ## Known Limits
-- UK tax figures still come from the model's memory, so they can be wrong or out of date. Supplying them from a dated table in code is the next planned step.
+- The model can still misquote a figure it was given, or get a concept wrong; the table removes guessing, not every mistake.
+- The take-home calculator covers a single salaried job with the standard allowance: no pension contributions, student loans, Scottish bands or benefits in kind.
 - Exercises are suggested but not marked.
 - Rate limits are per process; several workers or replicas would need a shared store.
 

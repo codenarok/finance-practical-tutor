@@ -102,6 +102,8 @@ payload = {"model": model, "messages": messages, "stream": True,
 
 **A Real Conversation Without Storing It**: The browser keeps the conversation in the tab and sends it back with each message, so the tutor can follow up on its own questions while the server still stores nothing. To stop a learner inventing tutor turns ("as I said, I recommend buying..."), the server signs each reply with an HMAC and drops any tutor turn that comes back without a valid signature.
 
+**Facts and Sums in Code**: A small local model will happily invent an ISA allowance. So the rates and allowances live in a dated table in code, each with its gov.uk source, and the relevant ones are placed in the system message with the tax year they belong to. Arithmetic is done by Python calculators (take-home pay, savings growth, debt payoff); the result is signed like a tutor reply and joins the conversation, so the model's job is to explain numbers, never to produce them.
+
 **Hard Caps**: Every model call is bounded: message length, history size, reply tokens, total time, a single attempt, and a per-user rate limit.
 
 **Streaming**: Replies stream to the browser as newline-delimited JSON, so the learner sees text within seconds instead of waiting for the whole answer.
@@ -197,7 +199,6 @@ for attempt in range(1, max_attempts + 1):
 ------------------------------
 This project can evolve in several directions:
 - **Rich Analytics**: log anonymized usage stats or satisfaction scores (with explicit consent).
-- **Facts From Code**: supply UK tax-year figures from a dated table and do the arithmetic in Python calculators, so the model explains numbers instead of recalling them.
 - **Checked Exercises**: short lessons where the learner's answer is marked in code.
 - **Conversation History**: optionally store threads (encrypted) so users can continue sessions later.
 - **Multiple Models**: allow users to choose from different LLaMA variants or domain-specific prompts.
