@@ -96,7 +96,7 @@ The backend sends a fixed system prompt that:
 - Lists the official figures for the chosen topic and the tax year they belong to, and tells the tutor to send learners to gov.uk for anything not listed rather than guess a number
 - Tells the tutor not to work out tax, pay, growth or repayment figures itself, and to use calculator results from the conversation exactly
 
-The disclaimer ("Educational guidance only — not professional financial advice") is part of the page itself, so it does not depend on the model remembering to say it.
+The disclaimer ("Education only. It cannot tell you what to do with your money.") is part of the page itself, so it does not depend on the model remembering to say it.
 
 ## UK Figures and Calculators
 `app/services/uk_figures.py` holds the figures for one tax year (currently 2026 to 2027, checked against gov.uk on 1 October 2026): Income Tax bands and Personal Allowance, employee and employer National Insurance, ISA and Lifetime ISA limits, pension allowances and automatic enrolment, the new State Pension, and the savings, dividend and capital gains allowances. Income Tax bands are for England, Wales and Northern Ireland.
@@ -134,13 +134,15 @@ There are nine lessons, at least one for every topic:
 Answers can be pounds, percentages or counts (such as months). To add a lesson, write a builder function in `lesson_library.py` and add it to `_BUILDERS`; the library tests then check its structure, that no hint gives the answer away, and that nothing leaks to the browser. Progress is kept in the browser tab only.
 
 ## The Advice Boundary
-The tutor teaches how money works. Telling someone what to buy or choose is a personal recommendation, which in the UK is regulated financial advice, so the app does not do it. `app/services/advice_boundary.py` enforces that in three places:
+The tutor teaches how money works. Telling someone what to buy or choose is a personal recommendation, which in the UK is regulated financial advice, so the app does not do it. `app/services/advice_boundary.py` enforces that in four places:
 
 1. **On the way in.** "Should I buy…", "which … is best", "can you recommend…" and similar are recognised. The instruction not to recommend is placed right beside the question, and the tutor is asked for what to weigh up instead.
 2. **Before an answer to such a question is shown.** The reply is held and checked. If it tells the learner what to do, or brings up a well-known platform, bank, fund house, company or coin the learner did not mention, a fixed answer is sent instead. If the model is down, the same fixed answer is sent, so these questions never fail.
 3. **After an ordinary streamed reply.** Text already sent cannot be taken back, so if it reads like a recommendation a reminder is shown under it.
 
-Questions about how things work ("how do I open an ISA?", "which ISAs count towards the allowance?") are not treated as advice requests. The product-name list is a backstop for common names, not a complete register.
+4. **Debt, always.** Advising a particular person what to do about their own debts is a separate regulated activity (debt counselling), and being free does not exempt it. A message asking which debt to pay first, whether to pay debt or save, or saying the learner is struggling to pay, is never sent to the model: it gets a fixed answer that points to free debt advice. A sum in the same message is still worked out and shown. The reply checks also catch instructions about paying debts.
+
+Questions about how things work ("how do I open an ISA?", "which ISAs count towards the allowance?", "how does credit card interest work?") are not treated as advice requests. The product-name list is a backstop for common names, not a complete register.
 
 ## Example Prompts
 - Topic: Budgeting — "How should I split my monthly salary?"
@@ -184,4 +186,4 @@ You can deploy the app container with a managed PostgreSQL instance. A hosted de
 Behind any proxy or ingress, run uvicorn with `--proxy-headers` so rate limiting sees the real client address.
 
 ## Financial Disclaimer
-The tutor is for educational purposes only and does not provide professional financial advice. Users should consult qualified advisors for personal finance decisions.
+The tutor is for education only. It does not give financial advice and cannot tell you what to do with your money. For a personal recommendation, speak to a regulated financial adviser. For help with debts, free debt advice is available; MoneyHelper lists where to find it.

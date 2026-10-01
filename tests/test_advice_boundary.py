@@ -192,3 +192,118 @@ def test_advice_inside_the_explanation_of_a_calculation_is_replaced_too(
     events = ask(client, auth_headers, read_events, "I owe £1,200 on a credit card at 24% APR and pay £50 a month. How long?")
     assert [e["type"] for e in events] == ["calculation", "token", "done"]
     assert events[1]["text"] == EXPLANATION_FALLBACK
+
+
+# --- debt: a learner's own debts get a fixed answer and never reach the model ---
+
+from app.services.advice_boundary import DEBT_FALLBACK, asks_about_own_debt  # noqa: E402
+
+
+@pytest.mark.parametrize(
+    "message",
+    [
+        "Which debt do I pay first, my car loan or my card?",
+        "I owe 3000 on two cards, what do I do?",
+        "Should I pay off my credit card or save first?",
+        "Is it better to clear my overdraft or my loan?",
+        "Should we overpay the mortgage?",
+        "How should I prioritise my debts?",
+        "Should I consolidate my loans?",
+        "What would you do about my credit card debt?",
+        "I can't afford my repayments this month",
+        "I'm behind on my credit card payments",
+        "I've missed a payment and a debt collector wrote to me",
+        "I'm struggling to keep up with my loan",
+    ],
+)
+def test_questions_about_the_learners_own_debts_are_spotted(message: str) -> None:
+    assert asks_about_own_debt(message)
+
+
+@pytest.mark.parametrize(
+    "message",
+    [
+        "How does credit card interest work?",
+        "What is APR?",
+        "What is the difference between a loan and an overdraft?",
+        "Why do people say to pay off expensive debt first?",
+        "What happens if someone misses a payment?",
+        "What is an IVA?",
+        "How does a minimum payment work?",
+        "I owe £1,200 on a credit card at 24% APR and pay £50 a month. How long to clear it?",
+        "Which fund should I buy?",
+        "What should I do with £5,000?",
+        "How do I open an ISA?",
+    ],
+)
+def test_how_debt_works_and_non_debt_questions_are_not_treated_as_own_debt(message: str) -> None:
+    assert not asks_about_own_debt(message)
+
+
+@pytest.mark.parametrize(
+    "reply",
+    [
+        "I recommend you pay off the card.",
+        "You should pay off your credit card first.",
+        "Clear the card first, then build savings.",
+        "You should prioritise the loan with the highest rate.",
+        "Here is a plan:\n- Pay off your overdraft\n- Then save",
+        "It makes sense to deal with your loan first.",
+        "I'd suggest consolidating your debts.",
+    ],
+)
+def test_replies_that_tell_the_learner_which_debt_to_pay_are_caught(reply: str) -> None:
+    assert reads_like_a_recommendation(reply)
+
+
+@pytest.mark.parametrize(
+    "reply",
+    [
+        "Interest is charged each month on what is still owed.",
+        "A larger payment clears a debt sooner and costs less interest.",
+        "People often pay the most expensive debt first because it costs the most to keep.",
+        "In the lesson, Dan pays off the card in 34 months.",
+        "A minimum payment mostly covers interest, so the balance falls slowly.",
+    ],
+)
+def test_explaining_how_debt_works_is_not_mistaken_for_debt_advice(reply: str) -> None:
+    assert not reads_like_a_recommendation(reply)
+
+
+def test_an_own_debt_question_gets_the_fixed_answer_without_calling_the_model(
+    client: TestClient, auth_headers, fake_ollama, read_events
+) -> None:
+    events = ask(client, auth_headers, read_events, "Which debt do I pay first, my car loan or my card?")
+    assert [e["type"] for e in events] == ["token", "done"]
+    assert events[0]["text"] == DEBT_FALLBACK
+    assert "free debt adviser" in DEBT_FALLBACK and "MoneyHelper" in DEBT_FALLBACK
+    assert fake_ollama.requests == []
+    assert signed_source(1, DEBT_FALLBACK, events[1]["sig"]) == "tutor"
+
+
+def test_a_sum_in_a_debt_worry_is_still_worked_out_but_not_explained_by_the_model(
+    client: TestClient, auth_headers, fake_ollama, read_events
+) -> None:
+    events = ask(
+        client, auth_headers, read_events,
+        "I owe £1,200 on a credit card at 24% APR and pay £50 a month. I'm struggling to keep up, what do I do?",
+    )
+    assert [e["type"] for e in events] == ["calculation", "token", "done"]
+    assert "Time to clear: 34 months" in events[0]["summary"]
+    assert events[1]["text"] == DEBT_FALLBACK
+    assert fake_ollama.requests == []
+
+
+def test_a_how_debt_works_question_still_goes_to_the_tutor(client: TestClient, auth_headers, fake_ollama, read_events) -> None:
+    fake_ollama.reply_pieces = ["Interest is charged each month on what is still owed."]
+    events = ask(client, auth_headers, read_events, "How does credit card interest work?")
+    assert [e["type"] for e in events] == ["token", "done"]
+    assert len(fake_ollama.requests) == 1
+
+
+def test_debt_advice_slipping_into_a_streamed_reply_is_followed_by_the_note(
+    client: TestClient, auth_headers, fake_ollama, read_events
+) -> None:
+    fake_ollama.reply_pieces = ["Interest adds up quickly. ", "You should pay off your credit card first."]
+    events = ask(client, auth_headers, read_events, "How does credit card interest work?")
+    assert [e["type"] for e in events] == ["token", "token", "note", "done"]

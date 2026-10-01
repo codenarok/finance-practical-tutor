@@ -2,6 +2,20 @@
 
 Newest first. Each entry: intent, action, validation, context for the next session.
 
+## 2026-10-01 – Debt advice closed off, and plainer wording
+
+**Intent.** A review found the advice boundary held for investments but not for debt: "Which debt do I pay first, my car loan or my card?" was not treated as an advice request, and a reply of "You should pay off your credit card first." passed the check. Advising a particular person about their own debts is debt counselling, a regulated activity with no exemption for being free (Regulated Activities Order article 39E; FCA PERG 17).
+
+**Action.**
+- `advice_boundary.py`: `asks_about_own_debt` recognises questions about the learner's own debts (which to pay first, pay off or save, prioritise, consolidate) and signs of difficulty (cannot pay, behind on payments, missed payments, debt collectors). The reply checks now also catch instructions about paying debts ("you should pay off…", "Clear the card first", "…your loan first").
+- Chat: such a message is never sent to the model. It gets `DEBT_FALLBACK`, fixed text that says what the tutor can explain instead and points to free debt advice through MoneyHelper. A sum in the same message is still calculated and shown first.
+- Wording: the page now says "Education only. It cannot tell you what to do with your money." in place of "Educational guidance only — not professional financial advice" ("guidance" has a specific meaning in UK finance), and "an exercise to try" in place of "something practical to try". The README disclaimer matches.
+- Rule for anything public about this project: never describe it as safe, compliant, guaranteed or personal.
+
+**Validation.** `python -m pytest`: 311 passed, with 12 own-debt phrasings that must be caught and 11 how-debt-works or non-debt questions that must not be.
+
+**Context for next session.** Explaining how debt works, for an invented person or in general, stays allowed: the debt lesson and the payoff calculator are unchanged. This is still pattern matching and still not a legal review.
+
 ## 2026-10-01 – The advice boundary, in code
 
 **Intent.** "Never recommend a product" was only a line in the prompt. Enforce it in code, the same way amounts are.

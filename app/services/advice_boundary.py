@@ -10,6 +10,13 @@ guarantee, so this module adds checks in code:
   reply is checked before the learner sees it.
 - `reads_like_a_recommendation` and `names_a_product` are the checks on a reply.
 
+Debt has its own, stricter rule. Advising a particular person what to do about their
+own debts (which to pay first, whether to pay debt or save) is debt counselling, also a
+regulated activity, and being free does not exempt it. So `asks_about_own_debt` routes
+those messages to a fixed answer with no model involved, and the reply checks also look
+for instructions about paying debts. Explaining how interest or a payoff works, for an
+invented person or in general, stays on the teaching side.
+
 These are pattern matches. They are cautious rather than clever: a message wrongly
 treated as asking for advice still gets a useful, general answer.
 """
@@ -45,18 +52,50 @@ _ASKS = [
     re.compile(r"\bgood time to (?:buy|sell|invest)\b", re.IGNORECASE),
 ]
 
+_DEBT_WORDS = re.compile(
+    r"\b(?:debts?|owe|owed|owing|(?:credit |store )?cards?|loans?|overdrafts?|arrears|mortgages?|"
+    r"repayments?|creditors?|lenders?|buy now pay later|bnpl|payday)\b",
+    re.IGNORECASE,
+)
+# Ways of asking "what should I do about what I owe" that the general patterns miss.
+_DEBT_ASKS = [
+    re.compile(r"\bwhich\b.{0,60}\b(?:first|pay|clear|tackle|prioriti[sz]e)\b", re.IGNORECASE),
+    re.compile(r"\bwhat (?:do|should|can|shall|would) (?:i|we) do\b", re.IGNORECASE),
+    re.compile(r"\b(?:pay(?:ing)? (?:off|down)|clear(?:ing)?|overpay(?:ing)?)\b.{0,80}\bor\b", re.IGNORECASE),
+    re.compile(r"\bprioriti[sz]e\b", re.IGNORECASE),
+    re.compile(r"\b(?:how|where) (?:do|should|can) (?:i|we) (?:start|get out|deal|cope)\b", re.IGNORECASE),
+]
+# Someone in difficulty needs a debt adviser, not a tutor, however the question is worded.
+_DEBT_DISTRESS = re.compile(
+    r"\b(?:(?:can'?t|cannot|can not|unable to|struggl\w+ to)\b.{0,40}\b(?:pay|repay|afford|keep up)|"
+    r"(?:behind|falling behind) (?:on|with)\b.{0,30}\b(?:payments?|repayments?|rent|bills?|mortgage|cards?|loans?)|"
+    r"missed (?:a |my |several |some )?(?:payments?|repayments?)|"
+    r"(?:bailiffs?|debt collectors?|enforcement agents?)\b.{0,60}\b(?:me|my|our|us)\b|"
+    r"\b(?:my|our|i|we)\b.{0,60}\b(?:bailiffs?|debt collectors?|ccj|default notice))\b",
+    re.IGNORECASE,
+)
+
 _RECOMMENDS = [
     re.compile(
         r"\bI(?:'d| would)?\s+(?:strongly |highly |personally |definitely )?(?:recommend|suggest|advise)\s+"
-        r"(?:that you |you |to )?(?:buy|sell|invest|put|open|choos|go|pick|switch|mov|tak|get|us|start|stick|consider)\w*",
+        r"(?:that you |you |to )?(?:buy|sell|invest|put|open|choos|go|pick|switch|mov|tak|get|us|start|stick|consider|"
+        r"pay|clear|prioriti|consolidat|tackl|focus|overpay)\w*",
         re.IGNORECASE,
     ),
     re.compile(
-        r"\byou should\s+(?:definitely |probably |really |just |simply |also )?"
+        r"\byou should\s+(?:definitely |probably |really |just |simply |also |first )?"
         r"(?:buy|sell|invest in|put (?:your|the|that|all|some)|go (?:with|for)|pick|choose|switch to|"
-        r"move (?:your|the|that)|open an?|take out|cash in)\b",
+        r"move (?:your|the|that)|open an?|take out|cash in|"
+        r"pay (?:off|down|the minimum)|clear|prioriti[sz]e|focus on|tackle|consolidate|overpay|stop paying)\b",
         re.IGNORECASE,
     ),
+    # Instructions about the learner's debts: "Clear the card first.", "...pay your loan first".
+    re.compile(
+        r"(?:^|[.!?:]\s+|\n\s*[-*•]?\s*)(?:pay off|pay down|clear|tackle|prioriti[sz]e|focus on|consolidate|overpay)\s+"
+        r"(?:your|the|that|this)\b",
+        re.IGNORECASE,
+    ),
+    re.compile(r"\b(?:your|the) (?:credit |store )?(?:cards?|loans?|overdraft|debts?|mortgage) first\b", re.IGNORECASE),
     re.compile(r"\b(?:my|our) (?:recommendation|advice|suggestion|pick|top pick) (?:is|would be)\b", re.IGNORECASE),
     re.compile(rf"\bthe best\s+(?:\w+\s+){{0,3}}?(?:option|choice|{_PRODUCT})\s+(?:for you\s+)?(?:is|would be)\b", re.IGNORECASE),
     re.compile(r"\b(?:definitely|just|simply) (?:buy|sell|invest in|go (?:with|for))\b", re.IGNORECASE),
@@ -97,6 +136,16 @@ BOUNDARY_FALLBACK = (
     "For a personal recommendation, a regulated financial adviser can give one; MoneyHelper explains how to find one."
 )
 
+DEBT_FALLBACK = (
+    "I can't tell you which debt to pay, in what order, or whether to pay debt or save. That depends on your "
+    "own circumstances, and advice about a person's own debts is regulated.\n"
+    "What I can do is explain how interest, minimum payments and payoff times work. The debt payoff calculator "
+    "above shows what a given payment does to a given balance, and the lesson \"What a debt really costs\" "
+    "walks through an example.\n"
+    "If repayments are a struggle, free and confidential debt advice is available. MoneyHelper, the "
+    "government-backed service, lists where to find a free debt adviser."
+)
+
 ADVICE_NOTE = (
     "Reminder: the tutor explains how things work. It cannot recommend what you personally should buy, sell "
     "or do with your money, so treat anything above that reads that way as a general example."
@@ -107,6 +156,16 @@ def asks_for_recommendation(message: str) -> bool:
     """True when a learner's message is asking what they should buy, choose or do."""
 
     return any(pattern.search(message) for pattern in _ASKS)
+
+
+def asks_about_own_debt(message: str) -> bool:
+    """True when a learner asks what to do about money they owe, or says they are struggling to pay."""
+
+    if _DEBT_DISTRESS.search(message):
+        return True
+    if not _DEBT_WORDS.search(message):
+        return False
+    return asks_for_recommendation(message) or any(pattern.search(message) for pattern in _DEBT_ASKS)
 
 
 def reads_like_a_recommendation(reply: str) -> bool:

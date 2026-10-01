@@ -6,7 +6,8 @@ Refreshed 2026-10-01.
 - Done on `main`: hygiene pass, conversation rewrite, UK figures from code, calculators, nine checked lessons (one or two per topic), and the unchecked-amounts note. See `CHANGELOG.md`.
 - Sums asked for in chat are done by the calculators in code (`app/services/intents.py`).
 - Requests for a personal recommendation are handled in code (`app/services/advice_boundary.py`).
-- 272 tests pass. Verified by hand in the browser against local Ollama.
+- A learner's question about their own debts gets a fixed answer with no model call.
+- 311 tests pass. Verified by hand in the browser against local Ollama.
 - The original five-step plan is complete. Open question: is this a portfolio piece or a product? What comes next depends on that answer.
 
 ## What is next (in order)
