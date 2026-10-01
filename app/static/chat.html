@@ -16,19 +16,42 @@
         </div>
         <button id="logout-btn" class="secondary">Logout</button>
       </div>
-      <div class="chat-window" id="chat-window">
+      <div class="chat-settings">
+        <div class="field">
+          <label for="knowledge-level">Your level</label>
+          <select id="knowledge-level">
+            <option selected>Beginner</option>
+            <option>Intermediate</option>
+            <option>Advanced</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="topic">Topic</label>
+          <select id="topic">
+            <option selected>General</option>
+            <option>Budgeting</option>
+            <option>Investing basics</option>
+            <option>UK taxes</option>
+            <option>Retirement</option>
+            <option>Risk management</option>
+            <option>Debt management</option>
+            <option>Business finance</option>
+          </select>
+        </div>
+      </div>
+      <div class="chat-window" id="chat-window" aria-live="polite">
         <div class="message bot">
           <div class="bubble">
-            What's your current finance knowledge level? (Beginner / Intermediate / Advanced)
+            Hi! Pick your level and a topic above, then ask me anything about money. I'll explain it simply and give you something practical to try.
           </div>
         </div>
       </div>
       <form id="chat-form" class="chat-input">
-        <input type="text" id="knowledge-level" placeholder="Knowledge level" value="Beginner" />
-        <input type="text" id="topic" placeholder="Topic e.g. budgeting" />
-        <input type="text" id="chat-message" placeholder="Ask a finance question" required />
-        <button type="submit">Send</button>
+        <label for="chat-message" class="visually-hidden">Your message</label>
+        <input type="text" id="chat-message" placeholder="Ask a finance question" maxlength="2000" autocomplete="off" required />
+        <button type="submit" id="send-btn">Send</button>
       </form>
+      <p class="note">This conversation lives only in this tab. Nothing is stored on the server.</p>
     </div>
   </div>
 

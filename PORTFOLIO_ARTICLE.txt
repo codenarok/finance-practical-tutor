@@ -33,16 +33,17 @@ Browser (HTML/CSS/JS)
     |  fetch()
     v
 FastAPI (AuthController, ChatController)
-    |-- UserManager (SQLAlchemy + passlib)
-    |-- LLaMAModel (Ollama prompt template)
+    |-- UserManager (SQLAlchemy + bcrypt)
+    |-- RateLimiter (login, register, chat)
+    |-- LLaMAModel (Ollama chat endpoint, fixed system prompt)
     |-- DatabaseManager (PostgreSQL/SQLite)
 ```
 
 **Key Technologies**
 - **FastAPI** for request handling and dependency injection.
 - **SQLAlchemy 2.0** for ORM access to PostgreSQL (dockerized) or SQLite (local dev).
-- **Passlib + bcrypt** for password hashing.
-- **python-jose** for JWT tokens.
+- **bcrypt** for password hashing.
+- **PyJWT** for JWT tokens.
 - **Ollama** running `llama3` locally for low-latency inference (no 3rd-party API keys).
 - **Vanilla HTML/CSS/JS** for the UI (easily portable to static hosting).
 - **Docker Compose** to orchestrate Postgres, the FastAPI app, and Ollama.
@@ -56,9 +57,11 @@ FastAPI (AuthController, ChatController)
 
 ```python
 # app/managers/user_manager.py
-password_hash = self.pwd_context.hash(password)
-session.add(User(email=email, password_hash=password_hash))
+new_user = User(email=normalise_email(email), password_hash=self.hash_password(password))
+session.add(new_user)
 ```
+
+Passwords must be at least 8 characters, emails are matched without regard to case, and login and registration are rate limited per client address. A login for an unknown email still runs a bcrypt check, so it takes as long as a wrong password.
 
 **JWT Tokens**: The `/api/register` and `/api/login` endpoints issue short-lived tokens. JWTs let the API remain stateless—every request carries its own proof of identity signed with the `SECRET_KEY`. This is essential once you scale horizontally because any replica can validate the token without checking shared session storage.
 
@@ -70,7 +73,7 @@ return TokenResponse(access_token=token)
 
 `OAuth2PasswordBearer` protects `/api/chat`. The `get_current_user` dependency decodes the JWT and loads the user from the DB. If the token is missing/invalid, FastAPI automatically returns `401`.
 
-**Client-Side Token Handling**: The front-end keeps tokens in `sessionStorage` (cleared on logout/refresh) and automatically redirects unauthorized users to the login page:
+**Client-Side Token Handling**: The front-end keeps tokens in `sessionStorage` (cleared on logout or when the tab closes) and automatically redirects unauthorized users to the login page:
 
 ```javascript
 // app/static/script.js
@@ -84,21 +87,26 @@ This means the chat view (`chat.html`) is inaccessible unless the user has a val
 
 4. AI Tutor Pipeline (Ollama + LLaMA)
 -------------------------------------
-**Prompt Engineering**: I enforce a deterministic structure so the tutor always returns three parts—explanation, exercise, disclaimer.
+**Prompt Engineering**: The tutor's rules live in a system message, and the learner's text only ever arrives as a user message. Level and topic are fixed choices, so nothing the learner types can rewrite the instructions.
 
 ```python
 # app/services/llama_model.py
-prompt = (
-    "You are a patient finance tutor..."
-    "1) Simplified explanation..."
-    "2) A safe exercise..."
-    "3) Add: 'This is educational only — not professional financial advice.'"
-)
-payload = {"model": settings.ollama_model, "prompt": prompt, "stream": False}
-response = requests.post(f"{settings.ollama_base_url}/api/generate", json=payload, timeout=60)
+messages = [
+    {"role": "system", "content": self.build_system_prompt(knowledge_level, topic)},
+    *history,
+    {"role": "user", "content": user_message},
+]
+payload = {"model": model, "messages": messages, "stream": True,
+           "options": {"num_predict": max_reply_tokens, "num_ctx": context_tokens}}
 ```
 
-**Error Handling**: Any exceptions from Ollama (network, timeout, missing model) are caught and transformed into a friendly 503 with a retry message. This keeps the UX predictable even when the model is unavailable.
+**A Real Conversation Without Storing It**: The browser keeps the conversation in the tab and sends it back with each message, so the tutor can follow up on its own questions while the server still stores nothing. To stop a learner inventing tutor turns ("as I said, I recommend buying..."), the server signs each reply with an HMAC and drops any tutor turn that comes back without a valid signature.
+
+**Hard Caps**: Every model call is bounded: message length, history size, reply tokens, total time, a single attempt, and a per-user rate limit.
+
+**Streaming**: Replies stream to the browser as newline-delimited JSON, so the learner sees text within seconds instead of waiting for the whole answer.
+
+**Error Handling**: The endpoint waits for the first piece of the reply before it starts responding, so a model that is down (network, missing model) becomes a friendly 503 rather than a broken stream. A failure mid-reply ends the stream with an error event and no signature.
 
 **Local AI Hosting**: Running the model via Ollama eliminates external API dependencies. In Docker, the `ollama` service exposes port `11434`, and the app container calls it over the internal network. For local Python runs, I can point `OLLAMA_BASE_URL` to `http://localhost:11434`.
 
@@ -166,16 +174,16 @@ for attempt in range(1, max_attempts + 1):
 - Lesson: Align framework and validation libraries early; mismatched versions cause confusing runtime errors.
 
 **2. Ollama Streaming vs Non-Streaming**
-- By default, Ollama streams NDJSON chunks. To keep the code simple, I set `"stream": false` to receive a single JSON blob.
-- Lesson: Always test with the actual model host; API defaults often differ from assumptions.
+- By default, Ollama streams NDJSON chunks. The first version set `"stream": false` to keep the code simple, which left learners staring at a blank screen for up to a minute. The app now relays the stream to the browser.
+- Lesson: Always test with the actual model host, on realistic hardware; what is simple for the code can be painful for the user.
 
 **3. Database Readiness in Containers**
 - When the FastAPI container booted faster than Postgres, `create_all()` failed. Adding retry/backoff fixed the crash-loop.
 - Lesson: Production setups need health checks or migrations; even local stacks benefit from resilience.
 
 **4. Bcrypt Version Mismatch**
-- Passlib expects bcrypt to expose a `__about__.__version__` attribute. The latest bcrypt releases removed it, causing `AttributeError: module 'bcrypt' has no attribute '__about__'` during login. I pinned `bcrypt==4.0.1`, the newest version still compatible with Passlib’s introspection, and documented the reasoning in `requirements.txt`.
-- Lesson: “Latest” is not always “best.” Understanding library internals and reading stack traces carefully prevents chasing the wrong bug.
+- Passlib expects bcrypt to expose a `__about__.__version__` attribute. The latest bcrypt releases removed it, causing `AttributeError: module 'bcrypt' has no attribute '__about__'` during login. The first fix was pinning `bcrypt==4.0.1`. The lasting fix was dropping Passlib, which is no longer maintained, and calling bcrypt directly; existing hashes kept working. The same pass replaced python-jose (known vulnerabilities, no fix for one of them) with PyJWT.
+- Lesson: A pin buys time, not safety. Audit dependencies and replace the ones nobody maintains.
 
 **5. Client-Side Security**
 - Storing tokens in `sessionStorage` (instead of `localStorage`) ensures sessions end when the tab closes. The chat page also enforces a token check before rendering.
@@ -189,10 +197,11 @@ for attempt in range(1, max_attempts + 1):
 ------------------------------
 This project can evolve in several directions:
 - **Rich Analytics**: log anonymized usage stats or satisfaction scores (with explicit consent).
+- **Facts From Code**: supply UK tax-year figures from a dated table and do the arithmetic in Python calculators, so the model explains numbers instead of recalling them.
+- **Checked Exercises**: short lessons where the learner's answer is marked in code.
 - **Conversation History**: optionally store threads (encrypted) so users can continue sessions later.
-- **Advanced Front-End**: port the UI to React or Vue, add streaming responses, or integrate charts.
 - **Multiple Models**: allow users to choose from different LLaMA variants or domain-specific prompts.
-- **CI/CD**: container image build + automated tests for both API and UI.
+- **CI/CD**: the API test suite runs on every push; a container image build and UI tests would be next.
 
 
 Closing Thoughts

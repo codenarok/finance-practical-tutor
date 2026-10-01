@@ -20,7 +20,7 @@ source .venv/bin/activate
 ------------------------------
 ```
 pip install --upgrade pip
-pip install -r requirements.txt
+pip install -r requirements-dev.txt
 ```
 
 
@@ -32,6 +32,8 @@ docker compose up db
 ```
 
 Option B – Use your own Postgres instance and create a database (e.g., `fintutor`).
+
+Option C – Skip Postgres and use SQLite: set `DATABASE_URL=sqlite:///./dev.db` in step 5.
 
 
 4. Start Ollama Server and Model
@@ -49,12 +51,10 @@ Keep the Ollama server running; the FastAPI app calls it at `http://localhost:11
 
 5. Configure Environment Variables
 ----------------------------------
-Create a `.env` file or export the variables manually, e.g.:
+Copy `.env.example` to `.env` and fill in `SECRET_KEY`. It must be 32 characters or more;
+the app refuses to start otherwise. Generate one with:
 ```
-export DATABASE_URL=postgresql+psycopg2://user:pass@localhost:5432/fintutor
-export SECRET_KEY=change-me
-export OLLAMA_BASE_URL=http://localhost:11434
-export OLLAMA_MODEL=llama3
+python3 -c "import secrets; print(secrets.token_urlsafe(48))"
 ```
 
 
@@ -69,20 +69,30 @@ The startup hook auto-creates tables (with retry) using the configured DB URL.
 7. Use the App
 --------------
 1. Visit `http://localhost:8000/static/index.html` to register or log in.
-2. After login, you are redirected to the chat UI (`chat.html`).
+2. After login, you are redirected to the chat UI (`chat.html`). Pick a level and topic, then ask.
+   Replies stream in as they are written, and follow-up questions keep the earlier conversation.
 3. Accounts persist in the database; hashed passwords ensure security even after server restarts.
 
 
 8. Optional – Full Stack via Docker Compose
 -------------------------------------------
-To spin up API + Postgres + Ollama in one go:
+To spin up API + Postgres + Ollama in one go (SECRET_KEY must be set, in `.env` or inline):
 ```
 docker compose up --build
 ```
-This exposes the API on `http://localhost:8000` and connects it to embedded Postgres and Ollama containers.
+The first run downloads the model before the app starts. The API is then on `http://localhost:8000`.
+
+
+9. Run the Tests
+----------------
+```
+python -m pytest
+```
+No Postgres or Ollama needed; the suite uses SQLite and a stand-in model server.
 
 Troubleshooting
 ---------------
-- If `/api/chat` returns “Tutor unavailable”, verify `ollama serve` is running and the model is pulled.
+- If the chat says the tutor is temporarily unavailable, verify `ollama serve` is running and the model is pulled.
+- A 429 response means the rate limit was hit; wait a minute.
 - For DB connection errors, ensure Postgres is reachable and credentials match `DATABASE_URL`.
 - Restart `uvicorn` whenever `.env` values change (settings are cached).

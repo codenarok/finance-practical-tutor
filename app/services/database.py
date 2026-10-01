@@ -1,4 +1,4 @@
-"""Database management using SQLAlchemy for PostgreSQL."""
+"""Database management using SQLAlchemy (PostgreSQL, or SQLite for local runs)."""
 from contextlib import contextmanager
 from time import sleep
 from typing import Generator
@@ -15,8 +15,10 @@ class DatabaseManager:
 
     def __init__(self) -> None:
         settings = get_settings()
-        self.engine = create_engine(settings.database_url, future=True)
-        self.SessionLocal = sessionmaker(bind=self.engine, autoflush=False, autocommit=False, future=True)
+        # FastAPI may run a dependency and its endpoint on different worker threads.
+        connect_args = {"check_same_thread": False} if settings.database_url.startswith("sqlite") else {}
+        self.engine = create_engine(settings.database_url, connect_args=connect_args)
+        self.SessionLocal = sessionmaker(bind=self.engine, autoflush=False, autocommit=False)
         self.Base = declarative_base()
 
     def create_all(self, max_attempts: int = 5, delay_seconds: float = 2.0) -> None:
