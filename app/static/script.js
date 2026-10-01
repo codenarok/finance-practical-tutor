@@ -120,6 +120,7 @@ async function readReply(res, bubble) {
   let reply = '';
   let outcome = { ok: false, detail: 'The reply was cut short. Please try again.' };
   let unchecked = [];
+  const notes = [];
 
   function handle(line) {
     if (!line.trim()) return;
@@ -135,10 +136,12 @@ async function readReply(res, bubble) {
       card.classList.add('calculation');
       chatWindow.insertBefore(card.parentElement, bubble.parentElement);
       conversation.push({ role: 'assistant', content: event.summary, sig: event.sig });
+    } else if (event.type === 'note') {
+      notes.push(event.text);
     } else if (event.type === 'caution') {
       unchecked = event.amounts;
     } else if (event.type === 'done') {
-      outcome = { ok: true, reply, sig: event.sig, unchecked };
+      outcome = { ok: true, reply, sig: event.sig, unchecked, notes };
     } else if (event.type === 'error') {
       outcome = { ok: false, detail: event.detail };
     }
@@ -477,6 +480,13 @@ function initChatPage() {
           bubble.appendChild(note);
           chatWindow.scrollTop = chatWindow.scrollHeight;
         }
+        outcome.notes.forEach((text) => {
+          const note = document.createElement('p');
+          note.className = 'unchecked';
+          note.textContent = text;
+          bubble.appendChild(note);
+          chatWindow.scrollTop = chatWindow.scrollHeight;
+        });
         conversation.push({ role: 'user', content: message });
         conversation.push({ role: 'assistant', content: outcome.reply, sig: outcome.sig });
         // The server only reads the newest turns that fit its budget; keep the list short.

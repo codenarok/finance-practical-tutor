@@ -34,6 +34,7 @@ FastAPI (AuthController, ChatController)
 - Calculators for take-home pay, savings growth and debt payoff: the app does the sums, and the signed result joins the chat for the tutor to explain
 - Lessons with questions marked in code: a hint on the first miss (specific to common mistakes), the working on the second, and the tutor can discuss any of it
 - Sums asked for in chat are done in code: "how much tax on £45,000?", "£200 a month at 5% for 10 years?" and "£1,200 at 24% APR paying £50 a month?" are spotted by pattern matching, answered by the calculators as a card, and only then explained by the tutor. That explanation is checked before it is shown and replaced if it contains any amount the app did not supply
+- An advice boundary held in code: a message asking what to buy, choose or do ("which fund should I buy?") is spotted by pattern matching, the tutor is told to explain how to weigh the choice instead, and its reply is checked before it is shown. A reply that recommends something, or names a well-known product the learner did not raise, is replaced with a fixed answer
 - A code-side check on every reply: any £ amount the app did not supply (from the figures, a calculator, a lesson or the learner's own message) is listed under the reply as "not checked by the app"
 - Hard caps on every model call: message length, history size, reply tokens, total time, one attempt, per-user rate limit
 - Simple responsive UI without front-end frameworks
@@ -91,7 +92,7 @@ The backend sends a fixed system prompt that:
 - States the learner's level and topic (both chosen from fixed lists)
 - Restricts scope to finance topics: investing basics, budgeting, UK taxes (PAYE/NI/ISA), retirement (ISA/SIPP/pensions), risk, debt, and business finance
 - Asks for a simplified explanation followed by a safe, practical exercise, and for follow-ups to be answered in context
-- Tells the tutor to teach concepts and never recommend specific products or tell learners what to do with their money
+- Tells the tutor to teach concepts and never recommend specific products or tell learners what to do with their money, and to set exercises that are learning tasks, never steps that open an account or move money
 - Lists the official figures for the chosen topic and the tax year they belong to, and tells the tutor to send learners to gov.uk for anything not listed rather than guess a number
 - Tells the tutor not to work out tax, pay, growth or repayment figures itself, and to use calculator results from the conversation exactly
 
@@ -132,6 +133,15 @@ There are nine lessons, at least one for every topic:
 
 Answers can be pounds, percentages or counts (such as months). To add a lesson, write a builder function in `lesson_library.py` and add it to `_BUILDERS`; the library tests then check its structure, that no hint gives the answer away, and that nothing leaks to the browser. Progress is kept in the browser tab only.
 
+## The Advice Boundary
+The tutor teaches how money works. Telling someone what to buy or choose is a personal recommendation, which in the UK is regulated financial advice, so the app does not do it. `app/services/advice_boundary.py` enforces that in three places:
+
+1. **On the way in.** "Should I buy…", "which … is best", "can you recommend…" and similar are recognised. The instruction not to recommend is placed right beside the question, and the tutor is asked for what to weigh up instead.
+2. **Before an answer to such a question is shown.** The reply is held and checked. If it tells the learner what to do, or brings up a well-known platform, bank, fund house, company or coin the learner did not mention, a fixed answer is sent instead. If the model is down, the same fixed answer is sent, so these questions never fail.
+3. **After an ordinary streamed reply.** Text already sent cannot be taken back, so if it reads like a recommendation a reminder is shown under it.
+
+Questions about how things work ("how do I open an ISA?", "which ISAs count towards the allowance?") are not treated as advice requests. The product-name list is a backstop for common names, not a complete register.
+
 ## Example Prompts
 - Topic: Budgeting — "How should I split my monthly salary?"
 - Topic: Investing basics — "What's the difference between a share and a fund?"
@@ -146,7 +156,8 @@ Answers can be pounds, percentages or counts (such as months). To add a lesson, 
 
 ## Known Limits
 - The model can still get a concept wrong. When the app has done the sum, the tutor's amounts are guaranteed to match it; in ordinary conversation a small model can still do a sum of its own, and the unchecked-amounts note flags those numbers rather than stopping them.
-- Calculation questions are recognised by pattern, so unusual phrasings are missed and fall back to the tutor.
+- Calculation questions and advice requests are recognised by pattern, so unusual phrasings are missed and fall back to the ordinary tutor, where the prompt rules and the after-the-fact notes are the only guard.
+- This is a teaching tool with guard rails, not a compliance system. It has not been reviewed against FCA rules.
 - The take-home calculator covers a single salaried job with the standard allowance: no pension contributions, student loans, Scottish bands or benefits in kind.
 - Lesson progress is not saved between visits, and all nine lessons are beginner level.
 - Rate limits are per process; several workers or replicas would need a shared store.

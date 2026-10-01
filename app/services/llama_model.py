@@ -7,6 +7,7 @@ import httpx
 
 from app.config import get_settings
 from app.services import uk_figures
+from app.services.advice_boundary import BOUNDARY_INSTRUCTION
 
 
 class TutorUnavailable(Exception):
@@ -33,7 +34,9 @@ class LLaMAModel:
             "business finance (profit, cashflow, forecasting, simple accounting). "
             "If asked about anything else, say it is outside what you teach and offer a finance topic instead.\n"
             "When the learner asks something new: give a simplified explanation, then one realistic, "
-            "safe step-by-step exercise they can do now. "
+            "safe step-by-step exercise they can do now. The exercise must be a learning task, such as working "
+            "something out, looking something up or comparing two things on paper; never a step that opens an "
+            "account, buys anything or moves money. "
             "When they reply to your question or exercise, respond to what they said rather than starting over. "
             "Ask a clarifying question only when you need one.\n"
             "You teach concepts. Never tell the learner which specific product, fund, share or provider "
@@ -55,6 +58,7 @@ class LLaMAModel:
         user_message: str,
         app_notes: tuple[str, ...] = (),
         calculation: str | None = None,
+        boundary: bool = False,
     ) -> list[dict[str, str]]:
         """Assemble the system prompt, the earlier conversation and the new message.
 
@@ -62,7 +66,8 @@ class LLaMAModel:
         the learner. They are written by the app, so they sit with the instructions rather
         than posing as things the tutor said. `calculation` is a sum the app has just done
         for this very message; it goes right beside the question, where a small model is
-        most likely to use it instead of redoing the sum.
+        most likely to use it instead of redoing the sum. `boundary` marks a message that
+        asks for a personal recommendation; the rule against giving one goes beside it too.
         """
 
         system = self.build_system_prompt(knowledge_level, topic)
@@ -83,6 +88,8 @@ class LLaMAModel:
                 "Explain this result to me in two or three short sentences, using only the amounts shown above. "
                 "Do not work out anything else.]"
             )
+        elif boundary:
+            user_message = f"{user_message}\n\n{BOUNDARY_INSTRUCTION}"
         return [
             {"role": "system", "content": system},
             *history,

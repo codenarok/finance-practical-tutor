@@ -2,6 +2,19 @@
 
 Newest first. Each entry: intent, action, validation, context for the next session.
 
+## 2026-10-01 – The advice boundary, in code
+
+**Intent.** "Never recommend a product" was only a line in the prompt. Enforce it in code, the same way amounts are.
+
+**Action.**
+- `app/services/advice_boundary.py`: `asks_for_recommendation` (patterns for "should I buy", "which … is best", "recommend", "is X a good investment" and similar), `reads_like_a_recommendation` (directive phrases in a reply) and `names_a_product` (a list of well-known platform, bank, fund-house, company and coin names the learner did not raise).
+- Chat: for an advice request the rule goes beside the question, the reply is held and checked, and `BOUNDARY_FALLBACK` replaces it if it recommends or names a product. A model outage also yields the fixed answer, so these questions never return a 503. In ordinary streamed replies a recommendation triggers a `note` event shown under the reply. The explanation of a calculation is now also replaced if it contains advice.
+- Prompt: exercises must be learning tasks, never steps that open an account, buy anything or move money. This followed a real reply whose "exercise" was to open an account with a platform.
+
+**Validation.** `python -m pytest`: 272 passed, with 20 advice-seeking phrasings that must be spotted and 15 how-it-works questions that must not be. Against the real model: "Which fund should I buy for my ISA?", "Should I buy Bitcoin?", "What's the best platform for a beginner?" and "Should I pay off my credit card or save first?" each got a no-recommendation answer about what to weigh up; "How do index funds work?" and "What is an ISA?" were answered normally with a paper exercise. The `note` under a streamed reply is covered by tests but was not seen in the browser.
+
+**Context for next session.** The patterns were narrowed after the first draft treated "How do I open an ISA?" as an advice request. General-principle questions such as "should I pay off debt or save first?" do count as advice requests; the tutor still answers them, in terms of what to compare. This is not a compliance review.
+
 ## 2026-10-01 – Sums in chat are done by the calculators
 
 **Intent.** "How much tax on 45000?" was still answered by the model doing arithmetic, sometimes wrongly. Route such questions to the calculators in code.

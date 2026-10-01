@@ -12,6 +12,13 @@ from app.controllers.auth_controller import get_current_user
 from app.models.user import User
 from app.services.llama_model import TutorUnavailable, llama_model
 from app.services.rate_limiter import chat_limiter
+from app.services.advice_boundary import (
+    ADVICE_NOTE,
+    BOUNDARY_FALLBACK,
+    asks_for_recommendation,
+    names_a_product,
+    reads_like_a_recommendation,
+)
 from app.services.amount_check import unchecked_amounts
 from app.services.intents import detect_calculation
 from app.services.signing import sign_reply, signed_source
@@ -108,8 +115,10 @@ def chat(payload: ChatRequest, user: User = Depends(get_current_user)) -> Stream
     text, an optional `caution` event listing amounts the app did not supply, then one
     `done` event with the signature for the full reply (or an `error` event).
 
-    After a `calculation`, the tutor's explanation is not streamed piece by piece: it is
-    checked first and sent whole, or replaced if it contains amounts of its own.
+    After a `calculation`, or when the message asks for a personal recommendation, the
+    reply is not streamed piece by piece: it is checked first and sent whole, or replaced
+    if it contains amounts of its own or tells the learner what to choose. A streamed
+    reply that reads like a recommendation is followed by a `note` event instead.
     """
 
     user_id = user.id
@@ -119,6 +128,10 @@ def chat(payload: ChatRequest, user: User = Depends(get_current_user)) -> Stream
     calculation = detect_calculation(payload.message)
     if calculation:
         reliable_texts.append(calculation)
+    # A request for a personal recommendation is answered with how to weigh the choice, never with a pick.
+    boundary = calculation is None and asks_for_recommendation(payload.message)
+    # In both cases the reply is held back and checked in code before the learner sees any of it.
+    held = bool(calculation) or boundary
     messages = llama_model.build_messages(
         knowledge_level=payload.knowledge_level,
         topic=payload.topic,
@@ -126,12 +139,13 @@ def chat(payload: ChatRequest, user: User = Depends(get_current_user)) -> Stream
         user_message=payload.message,
         app_notes=tuple(app_notes),
         calculation=calculation,
+        boundary=boundary,
     )
     # Numbers the reply may quote: the official figures, what the learner typed, what the app computed.
     reliable_texts += [messages[0]["content"], payload.message]
     tokens = llama_model.stream(messages)
     first: Optional[str] = None
-    if calculation is None:
+    if not held:
         # Wait for the first piece so a model that is down fails as a clean 503, not a broken stream.
         try:
             first = next(tokens)
@@ -151,28 +165,43 @@ def chat(payload: ChatRequest, user: User = Depends(get_current_user)) -> Stream
                 yield _event(type="token", text=first)
             for text in tokens:
                 parts.append(text)
-                if not calculation:
+                if not held:
                     yield _event(type="token", text=text)
         except TutorUnavailable as exc:
             logger.warning("Tutor unavailable mid-reply: %s", exc)
-            yield _event(type="error", detail=CALCULATED_BUT_UNAVAILABLE_DETAIL if calculation else UNAVAILABLE_DETAIL)
-            return
+            if not boundary:
+                yield _event(type="error", detail=CALCULATED_BUT_UNAVAILABLE_DETAIL if calculation else UNAVAILABLE_DETAIL)
+                return
+            parts.clear()  # the fixed boundary answer below needs no model
         finally:
             tokens.close()  # stops the model call if the browser went away mid-reply
-        if not parts:
+        reply = "".join(parts)
+        if calculation and not reply:
             yield _event(type="error", detail=CALCULATED_BUT_UNAVAILABLE_DETAIL)
             return
-        reply = "".join(parts)
+
         unchecked = unchecked_amounts(reply, reliable_texts)
+        recommends = reads_like_a_recommendation(reply)
         if calculation:
-            # The explanation of an exact result was held back until it could be checked.
-            # If the model added amounts of its own, the learner never sees them.
-            if unchecked:
-                logger.warning("Tutor explanation replaced: it contained %d amounts the app did not supply", len(unchecked))
+            # If the model added amounts of its own, or advice, the learner never sees them.
+            if unchecked or recommends:
+                logger.warning("Tutor explanation replaced (unchecked amounts: %d, advice: %s)", len(unchecked), recommends)
                 reply = EXPLANATION_FALLBACK
             yield _event(type="token", text=reply)
-        elif unchecked:
-            yield _event(type="caution", amounts=unchecked)
+        elif boundary:
+            if not reply or recommends or names_a_product(reply, payload.message):
+                if reply:
+                    logger.warning("Tutor reply to an advice request replaced (advice: %s)", recommends)
+                reply, unchecked = BOUNDARY_FALLBACK, []
+            yield _event(type="token", text=reply)
+            if unchecked:
+                yield _event(type="caution", amounts=unchecked)
+        else:
+            # Already streamed, so it cannot be taken back; the learner is told instead.
+            if unchecked:
+                yield _event(type="caution", amounts=unchecked)
+            if recommends:
+                yield _event(type="note", text=ADVICE_NOTE)
         yield _event(type="done", sig=sign_reply(user_id, reply))
 
     return StreamingResponse(events(), media_type="application/x-ndjson", headers={"Cache-Control": "no-store"})
