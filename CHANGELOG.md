@@ -2,6 +2,20 @@
 
 Newest first. Each entry: intent, action, validation, context for the next session.
 
+## 2026-10-01 – Sums in chat are done by the calculators
+
+**Intent.** "How much tax on 45000?" was still answered by the model doing arithmetic, sometimes wrongly. Route such questions to the calculators in code.
+
+**Action.**
+- `app/services/intents.py`: pattern matching over the message (no model call) for three questions: tax or take-home pay on a salary, savings growth, and debt payoff. It fires only when the wording and the numbers are unambiguous, and has an explicit list of things the calculators do not cover (Scotland, self-employment, bonuses, dividends, capital gains, weekly or hourly pay, and more).
+- Chat stream: a `calculation` event (summary plus app signature) is sent first. The model is then asked to explain it, with the result placed beside the question. In this case the explanation is not streamed: it is held, checked with `amount_check`, and replaced by a fixed sentence if it contains any amount the app did not supply. If the model is down the calculation still arrives, followed by an `error` event.
+- `amount_check` now accepts a trusted amount rounded to the nearest pound (£1,233.96 quoted as £1,234).
+- UI: the calculation card appears above the tutor's reply and joins the conversation.
+
+**Validation.** `python -m pytest`: 207 passed, including 21 phrasings that must not trigger a calculation. Against the real model: tax on 45000, take-home on 28k, a savings question and a debt question each produced the exact card and an explanation using only its amounts. Before the check was added, the same tax question produced "£15,080 at 40%" next to the correct card; that reply can no longer reach the learner. Seen working in the browser.
+
+**Context for next session.** Placing the calculation in the system message was not enough for the tax question; beside the question it worked. Whole-pound rounding by the model was the first cause of false replacements, hence the rounding rule. The fixed replacement sentence is `EXPLANATION_FALLBACK` in `chat_controller.py`.
+
 ## 2026-10-01 – Eight more lessons
 
 **Intent.** The first lesson's shape was accepted. Give every topic at least one.

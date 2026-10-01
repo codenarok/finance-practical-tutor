@@ -129,6 +129,12 @@ async function readReply(res, bubble) {
       bubble.classList.remove('typing');
       bubble.innerHTML = formatMessage(reply);
       chatWindow.scrollTop = chatWindow.scrollHeight;
+    } else if (event.type === 'calculation') {
+      // The app did this sum itself. Show it above the tutor's reply and keep it as a trusted turn.
+      const card = showMessage(event.summary, 'bot');
+      card.classList.add('calculation');
+      chatWindow.insertBefore(card.parentElement, bubble.parentElement);
+      conversation.push({ role: 'assistant', content: event.summary, sig: event.sig });
     } else if (event.type === 'caution') {
       unchecked = event.amounts;
     } else if (event.type === 'done') {

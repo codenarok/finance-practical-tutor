@@ -4,12 +4,12 @@ Refreshed 2026-10-01.
 
 ## State
 - Done on `main`: hygiene pass, conversation rewrite, UK figures from code, calculators, nine checked lessons (one or two per topic), and the unchecked-amounts note. See `CHANGELOG.md`.
-- 168 tests pass. Verified by hand in the browser against local Ollama.
+- Sums asked for in chat are done by the calculators in code (`app/services/intents.py`).
+- 207 tests pass. Verified by hand in the browser against local Ollama.
 - Open question: is this a portfolio piece or a product? Steps 4–5 below suit either; anything beyond them waits for that answer.
 
 ## What is next (in order)
-4. **Sums from the calculator.** Answer "how much tax on X?" in code rather than letting the model work it out (intent check, or a tool-calling model such as `llama3.1`).
-4b. **Lessons, next level.** A second lesson for the topics that have one, and intermediate lessons. Add builders to `app/services/lesson_library.py`; add hand-worked answers to `tests/test_lesson_library.py`.
+4. **Lessons, next level.** A second lesson for the topics that have one, and intermediate lessons. Add builders to `app/services/lesson_library.py`; add hand-worked answers to `tests/test_lesson_library.py`.
 5. **Advice boundary tests.** The prompt already says not to recommend products; add tests and a server-side check for "what should I buy" questions.
 
 ## Where things live
@@ -23,7 +23,8 @@ Refreshed 2026-10-01.
 
 ## Gotchas
 - App-written text (lessons, calculator results) is signed with source `app` and reaches the model inside the system message. Do not send it as assistant turns: a run of assistant turns made the small model redo sums or recite the lesson.
-- The unchecked-amounts note is a backstop, not a fix. The next improvement is answering "how much tax on X?" from the calculator in code.
+- After a `calculation` event the tutor's explanation is held and checked, not streamed. In ordinary conversation the unchecked-amounts note is still only a warning.
+- New calculator phrasings go in `app/services/intents.py` with a test on both sides: messages that must fire and messages that must not.
 - The figures table is for the 2026 to 2027 tax year. After 5 April 2027 re-read every source page on gov.uk and update `uk_figures.py`; never fill a figure from memory.
 - Chat tests must not assert the "Official UK figures" heading without passing a date, or they will fail when the tax year ends.
 - Settings are read at import time; tests set the environment in `conftest.py` before importing the app.

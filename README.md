@@ -33,6 +33,7 @@ FastAPI (AuthController, ChatController)
 - UK rates and allowances come from a dated table in code (each with its gov.uk source), not from the model's memory
 - Calculators for take-home pay, savings growth and debt payoff: the app does the sums, and the signed result joins the chat for the tutor to explain
 - Lessons with questions marked in code: a hint on the first miss (specific to common mistakes), the working on the second, and the tutor can discuss any of it
+- Sums asked for in chat are done in code: "how much tax on £45,000?", "£200 a month at 5% for 10 years?" and "£1,200 at 24% APR paying £50 a month?" are spotted by pattern matching, answered by the calculators as a card, and only then explained by the tutor. That explanation is checked before it is shown and replaced if it contains any amount the app did not supply
 - A code-side check on every reply: any £ amount the app did not supply (from the figures, a calculator, a lesson or the learner's own message) is listed under the reply as "not checked by the app"
 - Hard caps on every model call: message length, history size, reply tokens, total time, one attempt, per-user rate limit
 - Simple responsive UI without front-end frameworks
@@ -108,6 +109,8 @@ Once that tax year ends, the tutor is told the figures may have changed and says
 
 These are estimates with their assumptions stated in every result. They are not a payroll or a lender's figures.
 
+`app/services/intents.py` connects the chat to the calculators. It reads a message with regular expressions (no model call) and runs a calculator only when both the question and the numbers are clear. It stays quiet for anything ambiguous or outside what the calculators cover: two salaries in one message, weekly or hourly pay, Scottish bands, self-employment, bonuses, dividends, capital gains and so on. Those go to the tutor to answer in words.
+
 ## Lessons
 `app/services/lesson_library.py` holds short lessons: four explanations, each followed by a question. `app/services/lessons.py` is the engine that marks them. Marking is done in code, never by the model, and the answers are not sent to the browser until the question is finished. Every number in a lesson is computed from the figures table and the calculators, so lessons move with the tax year.
 
@@ -142,7 +145,8 @@ Answers can be pounds, percentages or counts (such as months). To add a lesson, 
 - No sensitive data other than login credentials is stored.
 
 ## Known Limits
-- The model can still get a concept wrong, and a small model sometimes does its own sums despite being told not to. The unchecked-amounts note flags those numbers; it does not stop them being written.
+- The model can still get a concept wrong. When the app has done the sum, the tutor's amounts are guaranteed to match it; in ordinary conversation a small model can still do a sum of its own, and the unchecked-amounts note flags those numbers rather than stopping them.
+- Calculation questions are recognised by pattern, so unusual phrasings are missed and fall back to the tutor.
 - The take-home calculator covers a single salaried job with the standard allowance: no pension contributions, student loans, Scottish bands or benefits in kind.
 - Lesson progress is not saved between visits, and all nine lessons are beginner level.
 - Rate limits are per process; several workers or replicas would need a shared store.

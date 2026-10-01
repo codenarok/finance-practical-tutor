@@ -54,12 +54,15 @@ class LLaMAModel:
         history: list[dict[str, str]],
         user_message: str,
         app_notes: tuple[str, ...] = (),
+        calculation: str | None = None,
     ) -> list[dict[str, str]]:
         """Assemble the system prompt, the earlier conversation and the new message.
 
         `app_notes` are lesson texts, marked answers and calculation results the app showed
         the learner. They are written by the app, so they sit with the instructions rather
-        than posing as things the tutor said.
+        than posing as things the tutor said. `calculation` is a sum the app has just done
+        for this very message; it goes right beside the question, where a small model is
+        most likely to use it instead of redoing the sum.
         """
 
         system = self.build_system_prompt(knowledge_level, topic)
@@ -71,6 +74,14 @@ class LLaMAModel:
                 f"{notes}\n\n"
                 "When the learner asks about any of this, answer their question briefly in your own words and use "
                 "these exact amounts. Do not repeat the material back, and do not calculate new amounts yourself."
+            )
+        if calculation:
+            user_message = (
+                f"{user_message}\n\n"
+                "[The app has already worked this out exactly. The result is:\n"
+                f"{calculation}\n"
+                "Explain this result to me in two or three short sentences, using only the amounts shown above. "
+                "Do not work out anything else.]"
             )
         return [
             {"role": "system", "content": system},

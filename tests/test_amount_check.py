@@ -21,6 +21,12 @@ def test_the_learners_own_numbers_count_even_without_a_pound_sign() -> None:
     assert unchecked_amounts("With £2,000 a month you could...", ["Show me that with 2000 pounds a month"]) == []
 
 
+def test_a_trusted_amount_rounded_to_the_pound_passes_but_a_near_miss_does_not() -> None:
+    trusted = ["Take-home pay: £23,680.08 a year, about £1,973.34 a month. National Insurance: £1,233.92 a year"]
+    assert unchecked_amounts("About £23,680 a year, £1,973 a month, with £1,234 of NI.", trusted) == []
+    assert unchecked_amounts("About £23,682 a year, or £1,975.50 a month.", trusted) == ["£23,682", "£1,975.50"]
+
+
 def test_percentages_and_plain_numbers_in_a_reply_are_not_amounts() -> None:
     assert unchecked_amounts("The rate is 20% for 35 years.", []) == []
 

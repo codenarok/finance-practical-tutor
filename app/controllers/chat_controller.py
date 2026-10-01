@@ -13,6 +13,7 @@ from app.models.user import User
 from app.services.llama_model import TutorUnavailable, llama_model
 from app.services.rate_limiter import chat_limiter
 from app.services.amount_check import unchecked_amounts
+from app.services.intents import detect_calculation
 from app.services.signing import sign_reply, signed_source
 
 
@@ -37,6 +38,13 @@ MAX_HISTORY_ITEMS = 40
 MAX_HISTORY_ITEM_CHARS = 8000
 
 UNAVAILABLE_DETAIL = "Tutor is temporarily unavailable. Please try again shortly."
+EXPLANATION_FALLBACK = (
+    "The figures above are exact, worked out by the app rather than by me. "
+    "Ask me about any line and I will explain what it means."
+)
+CALCULATED_BUT_UNAVAILABLE_DETAIL = (
+    "The calculation above is exact, but the tutor is temporarily unavailable to explain it. Please try again shortly."
+)
 
 
 class HistoryItem(BaseModel):
@@ -95,48 +103,75 @@ def _event(**fields: object) -> str:
 def chat(payload: ChatRequest, user: User = Depends(get_current_user)) -> StreamingResponse:
     """Stream a finance tutor reply without storing conversation logs.
 
-    The response is newline-delimited JSON: `token` events carrying text, an optional
-    `caution` event listing amounts the app did not supply, then one `done` event with
-    the signature for the full reply (or an `error` event).
+    The response is newline-delimited JSON: an optional `calculation` event when the
+    message asked for a sum the app can do itself, `token` events carrying the tutor's
+    text, an optional `caution` event listing amounts the app did not supply, then one
+    `done` event with the signature for the full reply (or an `error` event).
+
+    After a `calculation`, the tutor's explanation is not streamed piece by piece: it is
+    checked first and sent whole, or replaced if it contains amounts of its own.
     """
 
     user_id = user.id
     chat_limiter.check(str(user_id))
     history, app_notes, reliable_texts = trusted_history(user_id, payload.history)
+    # A sum the calculators can do is done here, in code; the model is only asked to explain it.
+    calculation = detect_calculation(payload.message)
+    if calculation:
+        reliable_texts.append(calculation)
     messages = llama_model.build_messages(
         knowledge_level=payload.knowledge_level,
         topic=payload.topic,
         history=history,
         user_message=payload.message,
         app_notes=tuple(app_notes),
+        calculation=calculation,
     )
     # Numbers the reply may quote: the official figures, what the learner typed, what the app computed.
     reliable_texts += [messages[0]["content"], payload.message]
     tokens = llama_model.stream(messages)
-    # Wait for the first piece so a model that is down fails as a clean 503, not a broken stream.
-    try:
-        first = next(tokens)
-    except (TutorUnavailable, StopIteration) as exc:
-        # The reason comes from the model server, never from the conversation.
-        logger.warning("Tutor unavailable: %s", exc or "empty reply")
-        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=UNAVAILABLE_DETAIL) from exc
+    first: Optional[str] = None
+    if calculation is None:
+        # Wait for the first piece so a model that is down fails as a clean 503, not a broken stream.
+        try:
+            first = next(tokens)
+        except (TutorUnavailable, StopIteration) as exc:
+            # The reason comes from the model server, never from the conversation.
+            logger.warning("Tutor unavailable: %s", exc or "empty reply")
+            raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=UNAVAILABLE_DETAIL) from exc
 
     def events() -> Iterator[str]:
-        parts = [first]
-        yield _event(type="token", text=first)
+        parts: list[str] = []
+        if calculation:
+            # Sent first and on its own, so the learner has the exact answer even if the model is down.
+            yield _event(type="calculation", summary=calculation, sig=sign_reply(user_id, calculation, source="app"))
         try:
+            if first is not None:
+                parts.append(first)
+                yield _event(type="token", text=first)
             for text in tokens:
                 parts.append(text)
-                yield _event(type="token", text=text)
+                if not calculation:
+                    yield _event(type="token", text=text)
         except TutorUnavailable as exc:
             logger.warning("Tutor unavailable mid-reply: %s", exc)
-            yield _event(type="error", detail=UNAVAILABLE_DETAIL)
+            yield _event(type="error", detail=CALCULATED_BUT_UNAVAILABLE_DETAIL if calculation else UNAVAILABLE_DETAIL)
             return
         finally:
             tokens.close()  # stops the model call if the browser went away mid-reply
+        if not parts:
+            yield _event(type="error", detail=CALCULATED_BUT_UNAVAILABLE_DETAIL)
+            return
         reply = "".join(parts)
         unchecked = unchecked_amounts(reply, reliable_texts)
-        if unchecked:
+        if calculation:
+            # The explanation of an exact result was held back until it could be checked.
+            # If the model added amounts of its own, the learner never sees them.
+            if unchecked:
+                logger.warning("Tutor explanation replaced: it contained %d amounts the app did not supply", len(unchecked))
+                reply = EXPLANATION_FALLBACK
+            yield _event(type="token", text=reply)
+        elif unchecked:
             yield _event(type="caution", amounts=unchecked)
         yield _event(type="done", sig=sign_reply(user_id, reply))
 
