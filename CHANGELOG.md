@@ -2,6 +2,21 @@
 
 Newest first. Each entry: intent, action, validation, context for the next session.
 
+## 2026-10-01 – Eight more lessons
+
+**Intent.** The first lesson's shape was accepted. Give every topic at least one.
+
+**Action.**
+- Lesson content moved to `app/services/lesson_library.py`; `lessons.py` is now only the engine.
+- Eight new lessons (nine in total): 50/30/20 budget, salary to take-home pay, compound growth, ISAs, workplace pensions, emergency fund and diversification, what a debt costs, profit versus cash. All amounts are computed from the figures table and calculators.
+- Number questions gained a unit (pounds, percent, or a count such as months) and a per-question tolerance; the answer box and the signed record use the unit.
+- UI: lessons are listed by topic; after a miss the old answer is selected so retyping replaces it.
+- `tests/test_lesson_library.py`: hand-worked expected answers for all 36 questions, plus checks on every question that the stored answer marks correct, no "common mistake" is the right answer, no hint or mistake feedback contains the answer, and nothing leaks into the browser payload. These caught one real slip while writing (a "mistake" value equal to the correct answer).
+
+**Validation.** `python -m pytest`: 168 passed. In the browser: the list shows nine lessons grouped by topic, and the budget lesson was worked through including a percentage answer.
+
+**Context for next session.** Lesson facts beyond the figures table (automatic enrolment rules, Lifetime ISA withdrawal charge) were taken from the gov.uk pages read on 2026-10-01. The three-month emergency fund and 50/30/20 are presented as rules of thumb, not official guidance. All lessons are beginner level.
+
 ## 2026-10-01 – First checked lesson
 
 **Intent.** The tutor suggested exercises but nothing checked the answers. Build one lesson end to end, marked in code, before writing more.

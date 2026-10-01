@@ -6,8 +6,9 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.services import lessons
+from app.services.lesson_library import LESSONS
 
-LESSON = lessons.LESSONS["income-tax-bands"]
+LESSON = LESSONS["income-tax-bands"]
 URL = "/api/lessons/income-tax-bands"
 
 
@@ -70,7 +71,8 @@ def test_lessons_need_a_token(client: TestClient) -> None:
 
 def test_lesson_list(client: TestClient, auth_headers) -> None:
     listed = client.get("/api/lessons", headers=auth_headers).json()
-    assert [(item["id"], item["topic"], item["questions"]) for item in listed] == [("income-tax-bands", "UK taxes", 4)]
+    assert ("income-tax-bands", "UK taxes", 4) in [(item["id"], item["topic"], item["questions"]) for item in listed]
+    assert len(listed) == len(LESSONS)
 
 
 def test_the_lesson_sent_to_the_browser_holds_no_answers(client: TestClient, auth_headers) -> None:
@@ -78,7 +80,7 @@ def test_the_lesson_sent_to_the_browser_holds_no_answers(client: TestClient, aut
     assert res.status_code == 200
     body = res.json()
     for step in body["steps"]:
-        assert set(step["question"]) == {"id", "prompt", "kind", "options"}
+        assert set(step["question"]) == {"id", "prompt", "kind", "options", "unit", "unit_label"}
     sent = json.dumps(body)
     for secret in ("7,430", "1,486", "8,232", "Have another go", "20% of £7,430"):
         assert secret not in sent

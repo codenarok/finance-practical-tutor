@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field
 from app.controllers.auth_controller import get_current_user
 from app.models.user import User
 from app.services import lessons
+from app.services.lesson_library import LESSONS
 from app.services.signing import sign_reply
 
 
@@ -32,6 +33,8 @@ class QuestionView(BaseModel):
     prompt: str
     kind: Literal["number", "choice"]
     options: list[OptionView]
+    unit: Literal["pounds", "percent", "count"]
+    unit_label: str
 
 
 class StepView(BaseModel):
@@ -84,7 +87,7 @@ def _summary(lesson: lessons.Lesson) -> dict:
 
 
 def _get_lesson(lesson_id: str) -> lessons.Lesson:
-    lesson = lessons.LESSONS.get(lesson_id)
+    lesson = LESSONS.get(lesson_id)
     if lesson is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Lesson not found")
     return lesson
@@ -95,7 +98,7 @@ def list_lessons(user: User = Depends(get_current_user)) -> list[LessonSummary]:
     """List the available lessons."""
 
     del user  # only checked for authentication
-    return [LessonSummary(**_summary(lesson)) for lesson in lessons.LESSONS.values()]
+    return [LessonSummary(**_summary(lesson)) for lesson in LESSONS.values()]
 
 
 @router.get("/{lesson_id}", response_model=LessonView)
@@ -111,6 +114,8 @@ def get_lesson(lesson_id: str, user: User = Depends(get_current_user)) -> Lesson
                 prompt=step.question.prompt,
                 kind=step.question.kind,
                 options=[OptionView(key=key, label=label) for key, label in step.question.options],
+                unit=step.question.unit,
+                unit_label=step.question.unit_label,
             ),
         )
         for step in lesson.steps

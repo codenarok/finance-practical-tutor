@@ -240,8 +240,10 @@ function initChatPage() {
       input.name = 'answer';
       input.inputMode = 'decimal';
       input.maxLength = 40;
-      input.placeholder = 'Your answer in £';
-      input.setAttribute('aria-label', 'Your answer in pounds');
+      const unitName = { pounds: '£', percent: '%' }[question.unit] || question.unit_label;
+      const spokenUnit = { pounds: 'pounds', percent: 'percent' }[question.unit] || question.unit_label;
+      input.placeholder = `Your answer in ${unitName}`;
+      input.setAttribute('aria-label', `Your answer in ${spokenUnit}`);
       input.autocomplete = 'off';
       input.required = true;
       row.append(input, check);
@@ -289,6 +291,11 @@ function initChatPage() {
           if (!result.revealed) {
             if (result.counted) attempt += 1;
             button.disabled = false;
+            // Select the old answer so the next one typed replaces it.
+            if (answerBox) {
+              answerBox.focus();
+              answerBox.select();
+            }
             return;
           }
           form.querySelectorAll('input').forEach((input) => { input.disabled = true; });
@@ -313,7 +320,16 @@ function initChatPage() {
     try {
       const lessons = await authedJson('/api/lessons');
       if (!lessons) return;
+      let currentTopic = null;
+      lessons.sort((a, b) => a.topic.localeCompare(b.topic));
       lessons.forEach((item) => {
+        if (item.topic !== currentTopic) {
+          currentTopic = item.topic;
+          const heading = document.createElement('p');
+          heading.className = 'lesson-topic';
+          heading.textContent = item.topic;
+          list.appendChild(heading);
+        }
         const row = document.createElement('div');
         row.className = 'lesson-item';
         const text = document.createElement('div');

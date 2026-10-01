@@ -3,16 +3,17 @@
 Refreshed 2026-10-01.
 
 ## State
-- Done on `main`: hygiene pass, conversation rewrite, UK figures from code, calculators, and the first checked lesson. See `CHANGELOG.md`.
-- 91 tests pass. Verified by hand in the browser against local Ollama.
+- Done on `main`: hygiene pass, conversation rewrite, UK figures from code, calculators, nine checked lessons (one or two per topic), and the unchecked-amounts note. See `CHANGELOG.md`.
+- 168 tests pass. Verified by hand in the browser against local Ollama.
 - Open question: is this a portfolio piece or a product? Steps 4–5 below suit either; anything beyond them waits for that answer.
 
 ## What is next (in order)
-4. **More lessons.** The first one (`income-tax-bands`) is the template; it is awaiting review. Once its shape is agreed, write two or three per topic in `app/services/lessons.py`, computing every amount from the figures table.
+4. **Sums from the calculator.** Answer "how much tax on X?" in code rather than letting the model work it out (intent check, or a tool-calling model such as `llama3.1`).
+4b. **Lessons, next level.** A second lesson for the topics that have one, and intermediate lessons. Add builders to `app/services/lesson_library.py`; add hand-worked answers to `tests/test_lesson_library.py`.
 5. **Advice boundary tests.** The prompt already says not to recommend products; add tests and a server-side check for "what should I buy" questions.
 
 ## Where things live
-- Routes: `app/controllers/` (auth, chat, calculators, lessons). Lessons and marking: `app/services/lessons.py`. UK figures: `app/services/uk_figures.py`. Sums: `app/services/calculators.py`. Model call and system prompt: `app/services/llama_model.py`. Caps and limits: `app/config.py` and the constants at the top of `chat_controller.py`. Rate limiter: `app/services/rate_limiter.py`.
+- Routes: `app/controllers/` (auth, chat, calculators, lessons). Lesson engine and marking: `app/services/lessons.py`. Lesson content: `app/services/lesson_library.py`. UK figures: `app/services/uk_figures.py`. Sums: `app/services/calculators.py`. Model call and system prompt: `app/services/llama_model.py`. Caps and limits: `app/config.py` and the constants at the top of `chat_controller.py`. Rate limiter: `app/services/rate_limiter.py`.
 - UI: `app/static/` (plain HTML/CSS/JS).
 - Tests: `tests/`; `conftest.py` has the stand-in Ollama server.
 

@@ -201,7 +201,7 @@ for attempt in range(1, max_attempts + 1):
 ------------------------------
 This project can evolve in several directions:
 - **Rich Analytics**: log anonymized usage stats or satisfaction scores (with explicit consent).
-- **More Lessons**: the first checked lesson is the template for two or three per topic.
+- **More Lessons**: nine beginner lessons cover every topic; intermediate ones are next.
 - **Sums by Tool**: route "how much tax on X?" to the calculator in code instead of the model.
 - **Conversation History**: optionally store threads (encrypted) so users can continue sessions later.
 - **Multiple Models**: allow users to choose from different LLaMA variants or domain-specific prompts.

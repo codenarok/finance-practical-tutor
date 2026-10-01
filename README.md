@@ -109,11 +109,25 @@ Once that tax year ends, the tutor is told the figures may have changed and says
 These are estimates with their assumptions stated in every result. They are not a payroll or a lender's figures.
 
 ## Lessons
-`app/services/lessons.py` holds short lessons: a few explanations, each followed by a question. Marking is done in code, never by the model, and the answers are not sent to the browser until the question is finished. Every number in a lesson is computed from the figures table and the calculators, so lessons move with the tax year.
+`app/services/lesson_library.py` holds short lessons: four explanations, each followed by a question. `app/services/lessons.py` is the engine that marks them. Marking is done in code, never by the model, and the answers are not sent to the browser until the question is finished. Every number in a lesson is computed from the figures table and the calculators, so lessons move with the tax year.
 
 A first wrong answer gets a hint, with specific feedback when it matches a known mistake (for example, taxing the whole salary at 20%). A second shows the working. Each explanation and each finished question joins the conversation as a signed turn, so the learner can ask the tutor "why was I wrong?" and get an answer about that exact question. The record is built from the server's reading of the answer, never the learner's raw text.
 
-There is one lesson so far, "How Income Tax bands work". Progress is kept in the browser tab only.
+There are nine lessons, at least one for every topic:
+
+| Topic | Lesson |
+| --- | --- |
+| Budgeting | A first budget: 50/30/20 |
+| UK taxes | How Income Tax bands work |
+| UK taxes | From salary to take-home pay |
+| Investing basics | How compound growth works |
+| Investing basics | How ISAs work |
+| Retirement | Workplace pensions: your employer pays in too |
+| Risk management | An emergency fund, and why to spread risk |
+| Debt management | What a debt really costs |
+| Business finance | Profit is not cash |
+
+Answers can be pounds, percentages or counts (such as months). To add a lesson, write a builder function in `lesson_library.py` and add it to `_BUILDERS`; the library tests then check its structure, that no hint gives the answer away, and that nothing leaks to the browser. Progress is kept in the browser tab only.
 
 ## Example Prompts
 - Topic: Budgeting — "How should I split my monthly salary?"
@@ -130,7 +144,7 @@ There is one lesson so far, "How Income Tax bands work". Progress is kept in the
 ## Known Limits
 - The model can still get a concept wrong, and a small model sometimes does its own sums despite being told not to. The unchecked-amounts note flags those numbers; it does not stop them being written.
 - The take-home calculator covers a single salaried job with the standard allowance: no pension contributions, student loans, Scottish bands or benefits in kind.
-- One lesson exists so far, and lesson progress is not saved between visits.
+- Lesson progress is not saved between visits, and all nine lessons are beginner level.
 - Rate limits are per process; several workers or replicas would need a shared store.
 
 ## Azure Deployment
