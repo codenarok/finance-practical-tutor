@@ -41,7 +41,7 @@ class CalculationResponse(BaseModel):
 
 
 def _respond(user: User, summary: str) -> CalculationResponse:
-    return CalculationResponse(summary=summary, sig=sign_reply(user.id, summary))
+    return CalculationResponse(summary=summary, sig=sign_reply(user.id, summary, source="app"))
 
 
 @router.post("/take-home", response_model=CalculationResponse)

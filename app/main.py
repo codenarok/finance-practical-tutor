@@ -7,7 +7,7 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
 from app.config import get_settings
-from app.controllers import auth_controller, calculator_controller, chat_controller
+from app.controllers import auth_controller, calculator_controller, chat_controller, lesson_controller
 from app.services.database import db_manager
 
 
@@ -26,6 +26,7 @@ app = FastAPI(title=settings.app_name, lifespan=lifespan)
 app.include_router(auth_controller.router)
 app.include_router(chat_controller.router)
 app.include_router(calculator_controller.router)
+app.include_router(lesson_controller.router)
 
 static_dir = Path(__file__).resolve().parent / "static"
 app.mount("/static", StaticFiles(directory=static_dir), name="static")

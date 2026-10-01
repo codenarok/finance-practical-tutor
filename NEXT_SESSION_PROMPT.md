@@ -3,16 +3,16 @@
 Refreshed 2026-10-01.
 
 ## State
-- Done on `main`: hygiene pass, conversation rewrite, UK figures from code, calculators. See `CHANGELOG.md`.
-- 62 tests pass. Verified by hand in the browser against local Ollama.
+- Done on `main`: hygiene pass, conversation rewrite, UK figures from code, calculators, and the first checked lesson. See `CHANGELOG.md`.
+- 91 tests pass. Verified by hand in the browser against local Ollama.
 - Open question: is this a portfolio piece or a product? Steps 4–5 below suit either; anything beyond them waits for that answer.
 
 ## What is next (in order)
-4. **Checked exercises.** Two or three short lessons per topic where the learner's answer is marked in code. Build one, review it, then scale out.
+4. **More lessons.** The first one (`income-tax-bands`) is the template; it is awaiting review. Once its shape is agreed, write two or three per topic in `app/services/lessons.py`, computing every amount from the figures table.
 5. **Advice boundary tests.** The prompt already says not to recommend products; add tests and a server-side check for "what should I buy" questions.
 
 ## Where things live
-- Routes: `app/controllers/` (auth, chat, calculators). UK figures: `app/services/uk_figures.py`. Sums: `app/services/calculators.py`. Model call and system prompt: `app/services/llama_model.py`. Caps and limits: `app/config.py` and the constants at the top of `chat_controller.py`. Rate limiter: `app/services/rate_limiter.py`.
+- Routes: `app/controllers/` (auth, chat, calculators, lessons). Lessons and marking: `app/services/lessons.py`. UK figures: `app/services/uk_figures.py`. Sums: `app/services/calculators.py`. Model call and system prompt: `app/services/llama_model.py`. Caps and limits: `app/config.py` and the constants at the top of `chat_controller.py`. Rate limiter: `app/services/rate_limiter.py`.
 - UI: `app/static/` (plain HTML/CSS/JS).
 - Tests: `tests/`; `conftest.py` has the stand-in Ollama server.
 
@@ -21,6 +21,8 @@ Refreshed 2026-10-01.
 - Quick run without Postgres: `DATABASE_URL=sqlite:///./preview.db .venv/bin/uvicorn app.main:app --port 8745` (`*.db` is ignored by git).
 
 ## Gotchas
+- App-written text (lessons, calculator results) is signed with source `app` and reaches the model inside the system message. Do not send it as assistant turns: a run of assistant turns made the small model redo sums or recite the lesson.
+- The unchecked-amounts note is a backstop, not a fix. The next improvement is answering "how much tax on X?" from the calculator in code.
 - The figures table is for the 2026 to 2027 tax year. After 5 April 2027 re-read every source page on gov.uk and update `uk_figures.py`; never fill a figure from memory.
 - Chat tests must not assert the "Official UK figures" heading without passing a date, or they will fail when the tax year ends.
 - Settings are read at import time; tests set the environment in `conftest.py` before importing the app.

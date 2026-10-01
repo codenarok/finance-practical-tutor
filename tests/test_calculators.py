@@ -92,7 +92,9 @@ def test_calculation_result_is_signed_and_trusted_as_history(client: TestClient,
     history = [{"role": "assistant", "content": result["summary"], "sig": result["sig"]}]
     client.post("/api/chat", json={"message": "Why is my tax that much?", "history": history}, headers=auth_headers)
     sent = fake_ollama.requests[0]["messages"]
-    assert sent[1] == {"role": "assistant", "content": result["summary"]}
+    # App-written results sit with the instructions, not among the tutor's own turns.
+    assert result["summary"] in sent[0]["content"]
+    assert [m["role"] for m in sent] == ["system", "user"]
 
 
 def test_savings_and_debt_endpoints(client: TestClient, auth_headers) -> None:

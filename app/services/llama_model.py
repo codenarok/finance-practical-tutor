@@ -48,12 +48,32 @@ class LLaMAModel:
         )
 
     def build_messages(
-        self, knowledge_level: str, topic: str, history: list[dict[str, str]], user_message: str
+        self,
+        knowledge_level: str,
+        topic: str,
+        history: list[dict[str, str]],
+        user_message: str,
+        app_notes: tuple[str, ...] = (),
     ) -> list[dict[str, str]]:
-        """Assemble the system prompt, the earlier conversation and the new message."""
+        """Assemble the system prompt, the earlier conversation and the new message.
 
+        `app_notes` are lesson texts, marked answers and calculation results the app showed
+        the learner. They are written by the app, so they sit with the instructions rather
+        than posing as things the tutor said.
+        """
+
+        system = self.build_system_prompt(knowledge_level, topic)
+        if app_notes:
+            notes = "\n\n".join(app_notes)
+            system += (
+                "\n\nThe app has shown the learner the following during this conversation "
+                "(lesson text, marked answers, calculation results). Every amount in it is exact:\n\n"
+                f"{notes}\n\n"
+                "When the learner asks about any of this, answer their question briefly in your own words and use "
+                "these exact amounts. Do not repeat the material back, and do not calculate new amounts yourself."
+            )
         return [
-            {"role": "system", "content": self.build_system_prompt(knowledge_level, topic)},
+            {"role": "system", "content": system},
             *history,
             {"role": "user", "content": user_message},
         ]

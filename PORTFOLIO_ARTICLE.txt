@@ -104,6 +104,8 @@ payload = {"model": model, "messages": messages, "stream": True,
 
 **Facts and Sums in Code**: A small local model will happily invent an ISA allowance. So the rates and allowances live in a dated table in code, each with its gov.uk source, and the relevant ones are placed in the system message with the tax year they belong to. Arithmetic is done by Python calculators (take-home pay, savings growth, debt payoff); the result is signed like a tutor reply and joins the conversation, so the model's job is to explain numbers, never to produce them.
 
+**Checked Lessons, and Checking the Tutor**: Lessons are marked in code: a hint on the first miss, the working on the second. Testing the first lesson exposed the limit of prompt rules. Asked why an answer was wrong, the model redid the sum and contradicted the lesson's own working. Telling it again, more firmly, made things worse. What worked was structural: app-written material goes into the system message as reference rather than as fake tutor turns, and a check in code compares every £ amount in a reply against the numbers the app actually supplied, flagging the rest to the learner as unchecked.
+
 **Hard Caps**: Every model call is bounded: message length, history size, reply tokens, total time, a single attempt, and a per-user rate limit.
 
 **Streaming**: Replies stream to the browser as newline-delimited JSON, so the learner sees text within seconds instead of waiting for the whole answer.
@@ -199,7 +201,8 @@ for attempt in range(1, max_attempts + 1):
 ------------------------------
 This project can evolve in several directions:
 - **Rich Analytics**: log anonymized usage stats or satisfaction scores (with explicit consent).
-- **Checked Exercises**: short lessons where the learner's answer is marked in code.
+- **More Lessons**: the first checked lesson is the template for two or three per topic.
+- **Sums by Tool**: route "how much tax on X?" to the calculator in code instead of the model.
 - **Conversation History**: optionally store threads (encrypted) so users can continue sessions later.
 - **Multiple Models**: allow users to choose from different LLaMA variants or domain-specific prompts.
 - **CI/CD**: the API test suite runs on every push; a container image build and UI tests would be next.

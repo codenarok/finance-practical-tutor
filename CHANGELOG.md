@@ -2,6 +2,25 @@
 
 Newest first. Each entry: intent, action, validation, context for the next session.
 
+## 2026-10-01 – First checked lesson
+
+**Intent.** The tutor suggested exercises but nothing checked the answers. Build one lesson end to end, marked in code, before writing more.
+
+**Action.**
+- `app/services/lessons.py`: lesson "How Income Tax bands work" (four parts, three number questions and one multiple choice). All amounts are computed from `uk_figures` and `calculators`. Marking: amounts accepted in any common format and within £1; first miss gets a hint (or feedback specific to a known mistake); second miss shows the working; unreadable input does not use up a try.
+- `app/controllers/lesson_controller.py`: `GET /api/lessons`, `GET /api/lessons/{id}` (no answers, hints or working in the payload), `POST /api/lessons/{id}/answer`. Explanations and finished-question records are signed so they join the conversation as trusted turns; records use the server's reading of the answer, not the learner's text.
+- UI: a "Lessons" panel; the lesson runs inside the chat window with the question form in the explanation card, and ends with a "right first time" count.
+
+- Found while testing the lesson: asked why an answer was wrong, the model redid the sum itself and reached £10,746 where the lesson's working says £8,232. Three changes followed.
+  - App-written text (lesson parts, marked answers, calculation results) now goes into the system message as material the app showed the learner, instead of posing as earlier tutor turns. A reminder placed as a trailing system message was tried first and made the model recite the whole lesson back; it was removed.
+  - Signatures now carry a source, `tutor` or `app` (`app/services/signing.py`).
+  - `app/services/amount_check.py`: after each reply, any £ amount that does not appear in the figures, the app's own texts or the learner's messages is sent as a `caution` event and shown under the reply as "not checked by the app". Earlier model replies do not vouch for their own numbers.
+- The reason for a model-server failure is now logged (never conversation content).
+
+**Validation.** `python -m pytest`: 91 passed. In the browser the whole lesson was worked through: a known mistake got its specific hint, a second miss showed the working. Against the real model with the lesson in context: "why isn't all of her salary taxed at 40%?" got a short explanation with no invented amounts; "how much tax on 45000?" got a sum the model did itself (correct this time) and the note listed £32,430 and £6,486 as unchecked.
+
+**Context for next session.** This is the demo lesson; its shape should be agreed before more are written. Lesson progress lives in the tab only, in keeping with storing nothing server-side beyond the account. One 503 from the model server appeared during testing and could not be reproduced; the new log line will show the cause if it recurs. The real fix for "how much tax on X?" is to answer it from the calculator rather than the model (needs a tool-calling model such as `llama3.1`, or an intent check in code).
+
 ## 2026-10-01 – UK figures from code, and calculators
 
 **Intent.** A finance tutor must not recall tax figures from memory or do sums in its head. Move both into code.

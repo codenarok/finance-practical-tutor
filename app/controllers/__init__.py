@@ -1,4 +1,4 @@
 """Expose controllers for FastAPI router inclusion."""
-from app.controllers import auth_controller, calculator_controller, chat_controller
+from app.controllers import auth_controller, calculator_controller, chat_controller, lesson_controller
 
-__all__ = ["auth_controller", "calculator_controller", "chat_controller"]
+__all__ = ["auth_controller", "calculator_controller", "chat_controller", "lesson_controller"]

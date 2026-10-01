@@ -137,8 +137,39 @@ select option { background: var(--card); color: var(--text); }
 
 .message.bot .bubble.calculation { border: 1px solid rgba(34, 211, 238, 0.35); }
 
-.calculators summary { cursor: pointer; color: var(--accent); font-weight: 600; }
-.calculators .note { margin: 0.5rem 0; }
+.bubble .unchecked {
+  margin: 0.75rem 0 0 0;
+  padding-top: 0.5rem;
+  border-top: 1px solid rgba(244, 114, 182, 0.4);
+  color: var(--danger);
+  font-size: 0.9rem;
+}
+.message.bot .bubble.correct { border: 1px solid rgba(74, 222, 128, 0.5); }
+
+.panel summary { cursor: pointer; color: var(--accent); font-weight: 600; }
+.panel .note { margin: 0.5rem 0; }
+
+.lesson-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.5rem 0;
+}
+.lesson-item h2 { font-size: 1rem; margin: 0; }
+.lesson-item p { margin: 0.25rem 0 0 0; }
+
+.lesson-question {
+  margin: 0.75rem 0 0 0;
+  padding-top: 0.75rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+.lesson-question .progress { color: var(--muted); font-size: 0.85rem; margin: 0; }
+.lesson-question .prompt { font-weight: 600; margin: 0; }
+.lesson-question .option { display: flex; gap: 0.5rem; align-items: baseline; color: var(--text); }
+.lesson-question .option input { padding: 0; }
+.lesson-question .answer-row { display: flex; gap: 0.5rem; }
+.lesson-question .answer-row input { flex: 1; min-width: 0; }
 .calculator-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);

@@ -28,10 +28,12 @@ FastAPI (AuthController, ChatController)
 - Registration and login with hashed passwords, a minimum password length and rate-limited attempts
 - JWT-protected chat endpoint; conversations are never stored server-side
 - A real conversation: the browser keeps the history in the tab and sends it with each message, and the reply streams in as it is written
-- Tutor replies are signed by the server, so a tutor turn the browser sends back is only trusted if this server wrote it
+- Tutor replies are signed by the server, so a tutor turn the browser sends back is only trusted if this server wrote it. The signature also records whether the model or the app wrote the text, so only app-computed numbers count as checked
 - Level and topic are fixed choices; the learner's text only ever reaches the model as a user message, never as part of the instructions
 - UK rates and allowances come from a dated table in code (each with its gov.uk source), not from the model's memory
 - Calculators for take-home pay, savings growth and debt payoff: the app does the sums, and the signed result joins the chat for the tutor to explain
+- Lessons with questions marked in code: a hint on the first miss (specific to common mistakes), the working on the second, and the tutor can discuss any of it
+- A code-side check on every reply: any £ amount the app did not supply (from the figures, a calculator, a lesson or the learner's own message) is listed under the reply as "not checked by the app"
 - Hard caps on every model call: message length, history size, reply tokens, total time, one attempt, per-user rate limit
 - Simple responsive UI without front-end frameworks
 
@@ -106,6 +108,13 @@ Once that tax year ends, the tutor is told the figures may have changed and says
 
 These are estimates with their assumptions stated in every result. They are not a payroll or a lender's figures.
 
+## Lessons
+`app/services/lessons.py` holds short lessons: a few explanations, each followed by a question. Marking is done in code, never by the model, and the answers are not sent to the browser until the question is finished. Every number in a lesson is computed from the figures table and the calculators, so lessons move with the tax year.
+
+A first wrong answer gets a hint, with specific feedback when it matches a known mistake (for example, taxing the whole salary at 20%). A second shows the working. Each explanation and each finished question joins the conversation as a signed turn, so the learner can ask the tutor "why was I wrong?" and get an answer about that exact question. The record is built from the server's reading of the answer, never the learner's raw text.
+
+There is one lesson so far, "How Income Tax bands work". Progress is kept in the browser tab only.
+
 ## Example Prompts
 - Topic: Budgeting — "How should I split my monthly salary?"
 - Topic: Investing basics — "What's the difference between a share and a fund?"
@@ -119,9 +128,9 @@ These are estimates with their assumptions stated in every result. They are not 
 - No sensitive data other than login credentials is stored.
 
 ## Known Limits
-- The model can still misquote a figure it was given, or get a concept wrong; the table removes guessing, not every mistake.
+- The model can still get a concept wrong, and a small model sometimes does its own sums despite being told not to. The unchecked-amounts note flags those numbers; it does not stop them being written.
 - The take-home calculator covers a single salaried job with the standard allowance: no pension contributions, student loans, Scottish bands or benefits in kind.
-- Exercises are suggested but not marked.
+- One lesson exists so far, and lesson progress is not saved between visits.
 - Rate limits are per process; several workers or replicas would need a shared store.
 
 ## Azure Deployment
